@@ -49,6 +49,19 @@ export interface OpportunityProvenance {
   discoveredAt: string;
   lastVerifiedAt?: string;
   verificationStatus: VerificationStatus;
+  /** Set only when the user confirmed the listing at its source. */
+  verifiedBy?: 'user';
+}
+
+export type ItemType = 'opportunity' | 'announcement';
+
+export interface ResourceLink {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  note?: string;
+  source: 'feed' | 'user';
 }
 
 export interface ProjectMatch {
@@ -128,6 +141,9 @@ export interface Opportunity extends OpportunityAssessment {
   updatedAt?: string;
   source?: 'seed' | 'manual' | 'feed' | 'import';
   provenance?: OpportunityProvenance;
+  itemType?: ItemType;
+  excludedRegions?: string[];
+  eligibilityNote?: string;
 }
 
 export interface FeedSourceStat {
@@ -155,6 +171,7 @@ export interface AppState {
   syncStatus?: SyncStatus;
   syncError?: string | null;
   theme: 'light' | 'dark';
+  resources?: ResourceLink[];
 }
 
-export type ActiveTab = 'dashboard' | 'opportunities' | 'pipeline' | 'profile';
+export type ActiveTab = 'dashboard' | 'opportunities' | 'other' | 'pipeline' | 'profile';

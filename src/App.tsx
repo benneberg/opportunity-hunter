@@ -1,3 +1,6 @@
+import OtherView from './components/OtherView';
+import {otherReason} from './lib/buckets';
+import type {ResourceLink} from './types';
 import {useEffect, useState} from 'react';
 import {Plus} from 'lucide-react';
 import type {ActiveTab, AppState, DeveloperProfile, Opportunity, WorkflowStatus} from './types';
@@ -26,6 +29,7 @@ import {OfflineIndicator} from './components/OfflineIndicator';
 const TAB_LABELS: Record<ActiveTab, string> = {
   dashboard: 'Dashboard',
   opportunities: 'Opportunities',
+  other: 'Other Links & Jobs',
   pipeline: 'Pipeline',
   profile: 'Profile & Rules',
 };
@@ -118,6 +122,17 @@ export default function App() {
       return {...draft, ...scoreOpportunity(draft, state.profile)};
     });
     commitState({...state, opportunities: updated});
+  };
+
+  const handleAddResource = (link: Omit<ResourceLink, 'id' | 'source'>) => {
+    if (!state) return;
+    const res: ResourceLink = {...link, id: `user-${Date.now().toString(36)}`, source: 'user'};
+    commitState({...state, resources: [...(state.resources || []), res]});
+  };
+
+  const handleRemoveResource = (id: string) => {
+    if (!state) return;
+    commitState({...state, resources: (state.resources || []).filter((r) => r.id !== id)});
   };
 
   const handleUpdateOpportunity = (id: string, patch: Partial<Opportunity>) => {
@@ -233,7 +248,9 @@ export default function App() {
   const inspectingOpp =
     inspectingId ? state.opportunities.find((o) => o.id === inspectingId) || null : null;
 
-  const newCount = state.opportunities.filter((o) => o.workflowStatus === 'new').length;
+  const mainList = state.opportunities.filter((o) => otherReason(o) === null);
+  const otherCount = state.opportunities.length - mainList.length;
+  const newCount = mainList.filter((o) => o.workflowStatus === 'new').length;
   const pipelineCount = state.opportunities.filter((o) =>
     ['saved', 'preparing', 'applied', 'interview'].includes(o.workflowStatus)
   ).length;
@@ -245,7 +262,8 @@ export default function App() {
         onSelectTab={setActiveTab}
         counts={{
           newCount,
-          totalCount: state.opportunities.length,
+          totalCount: mainList.length,
+          otherCount,
           pipelineCount,
         }}
         theme={state.theme}
@@ -285,7 +303,7 @@ export default function App() {
         <main className="flex-1 px-4 sm:px-8 py-6 max-w-6xl w-full mx-auto">
           {activeTab === 'dashboard' && (
             <DashboardView
-              opportunities={state.opportunities}
+              opportunities={mainList}
               lastFeedSync={state.lastFeedSync}
               feedStats={state.feedStats}
               syncStatus={state.syncStatus}
@@ -302,7 +320,7 @@ export default function App() {
 
           {activeTab === 'opportunities' && (
             <OpportunitiesView
-              opportunities={state.opportunities}
+              opportunities={mainList}
               onSelectOpportunity={(opp) => setInspectingId(opp.id)}
               onEditOpportunity={(opp) => {
                 setEditingOpp(opp);
@@ -315,6 +333,17 @@ export default function App() {
                 setModalOpen(true);
               }}
               onUpdateWorkflow={handleUpdateWorkflow}
+            />
+          )}
+
+          {activeTab === 'other' && (
+            <OtherView
+              opportunities={state.opportunities}
+              resources={state.resources || []}
+              onSelectOpportunity={(opp) => setInspectingId(opp.id)}
+              onUpdateWorkflow={handleUpdateWorkflow}
+              onAddResource={handleAddResource}
+              onRemoveResource={handleRemoveResource}
             />
           )}
 
