@@ -190,14 +190,34 @@ function evaluateProjectMatches(haystackLower, flagshipProjects) {
   return matches;
 }
 
+const STRONG_REGION_TERMS = ['worldwide', 'global', 'international', 'anywhere', 'europe', 'european', 'eu', 'eea', 'emea', 'nordic'];
+const US_LOCATION_TERMS = ['united states', 'usa', 'us', 'north america', 'americas'];
+
+/**
+ * Eligibility is conservative by design:
+ * - Only the listing's LOCATION field can raise eligibility; description text never confirms it.
+ * - Plain "remote" is NOT enough: many remote roles are restricted to specific countries.
+ * - "confirmed_eligible" requires the record to have been verified by the user.
+ */
 function assessEligibility(item, hayLower, profile) {
   const locText = `${item.location || ''}`.toLowerCase();
   const combinedLoc = `${locText} ${hayLower}`;
-  const primaryLower = String(profile.primaryLocation || 'Sweden').toLowerCase();
+  const primary = profile.primaryLocation || 'Sweden';
+  const primaryLower = String(primary).toLowerCase();
+  const isUserVerified = item.provenance?.verificationStatus === 'verified';
 
-  const blockedHit = (profile.blockedLocations || []).find((b) =>
-    hasSignalMatch(combinedLoc, b)
+  const reportedExcluded = (item.excludedRegions || []).some(
+    (r) => String(r).toLowerCase() === primaryLower
   );
+  if (reportedExcluded) {
+    return {
+      eligibility: 'confirmed_ineligible',
+      eligRatio: 0,
+      eligibilityReason: item.eligibilityNote || `Reported restriction for ${primary} (unverified; check the source)`,
+    };
+  }
+
+  const blockedHit = (profile.blockedLocations || []).find((b) => hasSignalMatch(combinedLoc, b));
   if (blockedHit) {
     return {
       eligibility: 'confirmed_ineligible',
@@ -206,56 +226,71 @@ function assessEligibility(item, hayLower, profile) {
     };
   }
 
-  const hasSwedenSignal =
-    hasSignalMatch(combinedLoc, primaryLower) ||
-    hasSignalMatch(combinedLoc, 'sweden') ||
-    hasSignalMatch(combinedLoc, 'stockholm') ||
-    hasSignalMatch(combinedLoc, 'gothenburg') ||
-    hasSignalMatch(combinedLoc, 'malmö') ||
-    hasSignalMatch(combinedLoc, 'nordic');
-
-  if (hasSwedenSignal) {
-    return {
-      eligibility: 'confirmed_eligible',
-      eligRatio: 1.0,
-      eligibilityReason: `Explicitly references ${profile.primaryLocation} / Nordic eligibility`,
-    };
+  const swedenTerms = [primaryLower, 'sweden', 'stockholm', 'gothenburg', 'malmö'];
+  if (swedenTerms.some((t) => hasSignalMatch(locText, t))) {
+    return isUserVerified
+      ? {
+          eligibility: 'confirmed_eligible',
+          eligRatio: 1.0,
+          eligibilityReason: `Location names ${primary} and you verified the listing`,
+        }
+      : {
+          eligibility: 'likely_eligible',
+          eligRatio: 0.9,
+          eligibilityReason: `Location names ${primary} ("${item.location}"); mark as verified after checking the source`,
+        };
   }
 
-  const hasRemoteOrEu =
-    (profile.preferredLocations || []).some((loc) => hasSignalMatch(locText, loc)) ||
-    hasSignalMatch(locText, 'remote') ||
-    hasSignalMatch(locText, 'worldwide') ||
-    hasSignalMatch(locText, 'global') ||
-    hasSignalMatch(locText, 'europe') ||
-    hasSignalMatch(locText, 'eu') ||
-    hasSignalMatch(locText, 'international');
+  const extraPreferred = (profile.preferredLocations || [])
+    .map((l) => String(l).toLowerCase())
+    .filter((l) => l !== 'remote' && l !== primaryLower);
+  const hasStrongRegion = [...STRONG_REGION_TERMS, ...extraPreferred].some((t) =>
+    hasSignalMatch(locText, t)
+  );
+  const hasUsHint =
+    US_LOCATION_TERMS.some((t) => hasSignalMatch(locText, t)) ||
+    NON_EU_CITY_HINTS.some((city) => locText.includes(city));
+  const isRemote = hasSignalMatch(locText, 'remote');
 
-  const isExplicitNonEuCityOnly =
-    NON_EU_CITY_HINTS.some((city) => locText.includes(city)) &&
-    !hasRemoteOrEu &&
-    !hasSwedenSignal;
-
-  if (isExplicitNonEuCityOnly) {
-    return {
-      eligibility: 'confirmed_ineligible',
-      eligRatio: 0.05,
-      eligibilityReason: `Location lists non-EU hub (${item.location}) without remote or Europe/Sweden option`,
-    };
-  }
-
-  if (hasRemoteOrEu) {
+  if (hasStrongRegion && !hasUsHint) {
     return {
       eligibility: 'likely_eligible',
       eligRatio: 0.8,
-      eligibilityReason: `Remote/Europe/Global indicator in "${item.location}"; verify ${profile.primaryLocation} contracting terms`,
+      eligibilityReason: `Listing location is open to Europe/worldwide ("${item.location}"); verify ${primary} contracting terms`,
     };
   }
-
+  if (hasStrongRegion && hasUsHint) {
+    return {
+      eligibility: 'requires_verification',
+      eligRatio: 0.5,
+      eligibilityReason: `Lists both a European/global option and a US location ("${item.location}"); check which applies to ${primary}`,
+    };
+  }
+  if (hasUsHint && !isRemote) {
+    return {
+      eligibility: 'confirmed_ineligible',
+      eligRatio: 0.05,
+      eligibilityReason: `On-site US/non-EU location (${item.location}) without a remote or Europe option`,
+    };
+  }
+  if (hasUsHint && isRemote) {
+    return {
+      eligibility: 'requires_verification',
+      eligRatio: 0.3,
+      eligibilityReason: `Remote but tied to a US location ("${item.location}"); confirm contracting from ${primary} is allowed`,
+    };
+  }
+  if (isRemote) {
+    return {
+      eligibility: 'requires_verification',
+      eligRatio: 0.5,
+      eligibilityReason: `Remote, but the allowed regions are not stated; many remote roles are limited to specific countries`,
+    };
+  }
   return {
     eligibility: 'requires_verification',
     eligRatio: 0.35,
-    eligibilityReason: `Eligibility for ${profile.primaryLocation} not explicitly confirmed in listing`,
+    eligibilityReason: `Eligibility for ${primary} not stated in the listing`,
   };
 }
 
@@ -301,23 +336,16 @@ export function scoreOpportunity(item, profile) {
   const techRatio = Math.min(1, Math.max(0.2, techHits.length / 3.5));
   const technicalPoints = Math.round(techRatio * w.technical);
 
-  // 5. Separated Deadline Urgency & Application Effort (10%)
+  // 5. Practical fit (10%): how much effort the application takes.
+  // Deadline urgency is NOT part of the score: it is reported separately as `deadlineUrgency`
+  // so a looming deadline never makes a weak match look better. (The weight key stays `urgency`
+  // for compatibility with stored profiles; the UI labels it "Practical Fit".)
   const effectiveExtStatus = inferExternalStatus(item.externalStatus, item.deadline);
   const daysLeft = daysUntilDeadline(item.deadline);
   let deadlineUrgency = 'open';
-  let urgencyRatio = 0.65;
-  if (effectiveExtStatus === 'closed') {
-    deadlineUrgency = 'closed';
-    urgencyRatio = 0;
-  } else if (effectiveExtStatus === 'closing_soon' || (daysLeft !== null && daysLeft <= 14)) {
-    deadlineUrgency = 'urgent';
-    // Only boost urgency modestly so weak listings don't outrank strong matches just by expiring soon
-    urgencyRatio = skillsPoints >= w.skills * 0.45 ? 1.0 : 0.75;
-  } else if (item.deadline) {
-    deadlineUrgency = 'normal';
-    urgencyRatio = 0.75;
-  }
-  const urgencyPoints = Math.round(urgencyRatio * w.urgency);
+  if (effectiveExtStatus === 'closed') deadlineUrgency = 'closed';
+  else if (effectiveExtStatus === 'closing_soon' || (daysLeft !== null && daysLeft <= 14)) deadlineUrgency = 'urgent';
+  else if (item.deadline) deadlineUrgency = 'normal';
 
   const applicationEffort =
     item.category === 'Grants & Competitions' || item.category === 'Community & Fellowships'
@@ -325,6 +353,8 @@ export function scoreOpportunity(item, profile) {
       : item.category === 'Early Access & Credits' || /prolific|study|credits/i.test(hayLower)
         ? 'low'
         : 'medium';
+  const practicalRatio = applicationEffort === 'low' ? 1.0 : applicationEffort === 'medium' ? 0.75 : 0.5;
+  const urgencyPoints = Math.round(practicalRatio * w.urgency);
 
   const qualityMax = w.skills + w.eligibility + w.preference + w.technical;
   const opportunityQuality = Math.round(
@@ -334,6 +364,9 @@ export function scoreOpportunity(item, profile) {
   let total = skillsPoints + eligibilityPoints + preferencePoints + technicalPoints + urgencyPoints;
   if (eligResult.eligibility === 'confirmed_ineligible') {
     total = Math.min(35, total);
+  }
+  if (deadlineUrgency === 'closed') {
+    total = Math.min(40, total);
   }
   if (effectiveExtStatus === 'closed') {
     total = Math.min(30, total);
