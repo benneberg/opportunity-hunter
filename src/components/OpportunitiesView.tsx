@@ -1,5 +1,5 @@
 import React, {useMemo, useState} from 'react';
-import {Edit3, ExternalLink, FileJson, Plus, Search, SlidersHorizontal} from 'lucide-react';
+import {ArrowUpDown, Edit3, ExternalLink, FileJson, Plus, Search} from 'lucide-react';
 import type {
   EligibilityStatus,
   ExternalStatus,
@@ -21,6 +21,14 @@ import {
   scoreTextClass,
 } from '../lib/format';
 
+type SortOption =
+  | 'score_desc'
+  | 'score_asc'
+  | 'discovered_desc'
+  | 'discovered_asc'
+  | 'org_asc'
+  | 'deadline_asc';
+
 interface OpportunitiesViewProps {
   opportunities: Opportunity[];
   onSelectOpportunity: (opp: Opportunity) => void;
@@ -41,7 +49,7 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
   const [eligibilityFilter, setEligibilityFilter] = useState<'all' | EligibilityStatus>('all');
   const [externalFilter, setExternalFilter] = useState<'all' | ExternalStatus>('all');
   const [workflowFilter, setWorkflowFilter] = useState<'all_active' | 'all' | WorkflowStatus>('all_active');
-  const [sortBy, setSortBy] = useState<'score' | 'recent' | 'deadline'>('score');
+  const [sortBy, setSortBy] = useState<SortOption>('score_desc');
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -73,14 +81,27 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
         return hay.includes(q);
       })
       .sort((a, b) => {
-        if (sortBy === 'score') return b.score - a.score;
-        if (sortBy === 'deadline') {
-          if (!a.deadline && !b.deadline) return b.score - a.score;
-          if (!a.deadline) return 1;
-          if (!b.deadline) return -1;
-          return a.deadline.localeCompare(b.deadline);
+        switch (sortBy) {
+          case 'score_desc':
+            return b.score - a.score || b.discoveredAt.localeCompare(a.discoveredAt);
+          case 'score_asc':
+            return a.score - b.score || b.discoveredAt.localeCompare(a.discoveredAt);
+          case 'discovered_desc':
+            return b.discoveredAt.localeCompare(a.discoveredAt) || b.score - a.score;
+          case 'discovered_asc':
+            return a.discoveredAt.localeCompare(b.discoveredAt) || b.score - a.score;
+          case 'org_asc':
+            return (
+              a.organization.localeCompare(b.organization, undefined, {sensitivity: 'base'}) ||
+              b.score - a.score
+            );
+          case 'deadline_asc': {
+            if (!a.deadline && !b.deadline) return b.score - a.score;
+            if (!a.deadline) return 1;
+            if (!b.deadline) return -1;
+            return a.deadline.localeCompare(b.deadline) || b.score - a.score;
+          }
         }
-        return b.discoveredAt.localeCompare(a.discoveredAt);
       });
   }, [opportunities, search, categoryFilter, eligibilityFilter, externalFilter, workflowFilter, sortBy]);
 
@@ -181,16 +202,19 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
           </select>
 
           <div className="flex items-center gap-1.5">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <select
               aria-label="Sort opportunities"
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'score' | 'recent' | 'deadline')}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
-              <option value="score">Sort: Highest fit score</option>
-              <option value="deadline">Sort: Soonest deadline</option>
-              <option value="recent">Sort: Newly discovered</option>
+              <option value="score_desc">Sort: Score (High to Low)</option>
+              <option value="score_asc">Sort: Score (Low to High)</option>
+              <option value="discovered_desc">Sort: Date Discovered (Newest)</option>
+              <option value="discovered_asc">Sort: Date Discovered (Oldest)</option>
+              <option value="org_asc">Sort: Organization (A–Z)</option>
+              <option value="deadline_asc">Sort: Soonest Deadline</option>
             </select>
           </div>
         </div>
@@ -265,6 +289,8 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
                           <span className="font-mono tabular-nums">Due {opp.deadline}</span>
                         </>
                       )}
+                      <span aria-hidden="true">·</span>
+                      <span className="font-mono tabular-nums">Discovered {opp.discoveredAt}</span>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
