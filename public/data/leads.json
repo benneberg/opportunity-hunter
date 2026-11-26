@@ -1,0 +1,310 @@
+{
+  "updatedAt": "2026-11-26",
+  "note": "Hand-maintained leads and resource links. Leads are unverified starting points.",
+  "leads": [
+    {
+      "title": "Alignerr: AI training and coding evaluation",
+      "organization": "Alignerr",
+      "category": "Recruitment & Contracting",
+      "location": "Remote (international; Swedish-accessible roles reported)",
+      "url": "https://www.alignerr.com",
+      "summary": "Lead from research notes, not verified. Technical model evaluation, coding and writing tasks.",
+      "tags": [
+        "llm",
+        "model evaluation",
+        "coding"
+      ],
+      "externalStatus": "unknown"
+    },
+    {
+      "title": "Outlier: prompt writing and response evaluation",
+      "organization": "Outlier",
+      "category": "Recruitment & Contracting",
+      "location": "Remote (Sweden listed in published country policy)",
+      "url": "https://outlier.ai",
+      "summary": "Lead from research notes, not verified. Project-based evaluation, ranking and coding tasks; projects require qualification assessments.",
+      "tags": [
+        "llm",
+        "model evaluation",
+        "prompt engineering"
+      ],
+      "externalStatus": "unknown"
+    },
+    {
+      "title": "micro1: AI evaluation and technical specialists",
+      "organization": "micro1",
+      "category": "Recruitment & Contracting",
+      "location": "Remote (international)",
+      "url": "https://www.micro1.ai",
+      "summary": "Lead from research notes, not verified. Technical AI assessment and model training roles with interviews.",
+      "tags": [
+        "llm",
+        "model evaluation"
+      ],
+      "externalStatus": "unknown"
+    },
+    {
+      "title": "DataAnnotation: coding and reasoning evaluation",
+      "organization": "DataAnnotation",
+      "category": "Recruitment & Contracting",
+      "location": "Remote",
+      "url": "https://www.dataannotation.tech",
+      "summary": "Lead from research notes, not verified. Coding, reasoning and writing evaluation.",
+      "tags": [
+        "llm",
+        "model evaluation",
+        "coding"
+      ],
+      "externalStatus": "unknown",
+      "excludedRegions": [
+        "Sweden"
+      ],
+      "eligibilityNote": "A Sweden restriction was reported (unverified; check the source)"
+    },
+    {
+      "title": "TELUS Digital AI Community",
+      "organization": "TELUS Digital",
+      "category": "Recruitment & Contracting",
+      "location": "Remote (international; language projects may include Swedish)",
+      "url": "https://www.telusdigital.com/ai-community",
+      "summary": "Lead from research notes, not verified. Data annotation, search evaluation and language quality projects.",
+      "tags": [
+        "annotation",
+        "model evaluation"
+      ],
+      "externalStatus": "unknown"
+    },
+    {
+      "title": "OneForma: multilingual AI data projects",
+      "organization": "OneForma",
+      "category": "Recruitment & Contracting",
+      "location": "Remote (international)",
+      "url": "https://www.oneforma.com",
+      "summary": "Lead from research notes, not verified. Multilingual data, transcription, evaluation and data collection.",
+      "tags": [
+        "annotation",
+        "data"
+      ],
+      "externalStatus": "unknown"
+    },
+    {
+      "title": "Surge AI: human feedback and specialist data work",
+      "organization": "Surge AI",
+      "category": "Recruitment & Contracting",
+      "location": "Remote",
+      "url": "https://www.surgehq.ai",
+      "summary": "Lead from research notes, not verified. Human feedback and specialist data work; allowed regions not known.",
+      "tags": [
+        "llm",
+        "model evaluation"
+      ],
+      "externalStatus": "unknown"
+    },
+    {
+      "title": "AfterQuery: specialist evaluation and AI training",
+      "organization": "AfterQuery",
+      "category": "Recruitment & Contracting",
+      "location": "Remote (Sweden-accessible listings reported)",
+      "summary": "Lead from research notes, not verified. Find the official site before applying.",
+      "tags": [
+        "llm",
+        "model evaluation"
+      ],
+      "externalStatus": "unknown"
+    },
+    {
+      "title": "Prolific: research studies including AI evaluations",
+      "organization": "Prolific",
+      "category": "Research & Model Evaluation",
+      "location": "Remote (international; Sweden reportedly supported)",
+      "url": "https://www.prolific.com",
+      "summary": "Lead from research notes, not verified. Paid research participation, sometimes testing or comparing AI systems.",
+      "tags": [
+        "research",
+        "model evaluation"
+      ],
+      "externalStatus": "unknown"
+    },
+    {
+      "title": "OpenAI OpenWorks pilot",
+      "organization": "OpenAI",
+      "category": "Partnerships & Innovation",
+      "location": "United States (in-person pilot)",
+      "summary": "Lead from research notes, not verified. Individuals and small teams applying with a real problem solved using AI; at least four days per month plus a monthly workshop. International expansion is not promised, but you can still express interest.",
+      "tags": [
+        "llm",
+        "api",
+        "partnership"
+      ],
+      "compensation": "Contractor stipend up to $8,000/month",
+      "externalStatus": "unknown",
+      "excludedRegions": [
+        "Sweden"
+      ],
+      "eligibilityNote": "The pilot expects in-person work in the US (reported); you can still express interest"
+    },
+    {
+      "title": "OpenAI Researcher Access Program",
+      "organization": "OpenAI",
+      "category": "Grants & Competitions",
+      "location": "Check eligibility (research affiliation required)",
+      "summary": "Lead from research notes, not verified. API credits for research on safety, societal impact and responsible deployment; reported to require an academic, research or nonprofit affiliation.",
+      "tags": [
+        "llm",
+        "research",
+        "api credits"
+      ],
+      "compensation": "Up to $1,000 API credits",
+      "externalStatus": "unknown"
+    },
+    {
+      "title": "Anthropic Fellows Program",
+      "organization": "Anthropic",
+      "category": "Community & Fellowships",
+      "location": "Remote-friendly (US), London, Canada",
+      "url": "https://www.anthropic.com/careers",
+      "summary": "Lead from research notes, not verified. Research tracks including AI safety, security, ML systems and reinforcement learning. Do not assume eligibility from Sweden.",
+      "tags": [
+        "llm",
+        "research",
+        "safety"
+      ],
+      "externalStatus": "unknown"
+    }
+  ],
+  "resources": [
+    {
+      "id": "anthropic-careers",
+      "name": "Anthropic careers",
+      "url": "https://www.anthropic.com/careers",
+      "type": "company",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "openai-careers",
+      "name": "OpenAI careers",
+      "url": "https://openai.com/careers",
+      "type": "company",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "google-deepmind-careers",
+      "name": "Google DeepMind careers",
+      "url": "https://deepmind.google/about/careers/",
+      "type": "company",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "meta-careers",
+      "name": "Meta careers",
+      "url": "https://www.metacareers.com",
+      "type": "company",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "mistral-ai-careers",
+      "name": "Mistral AI careers",
+      "url": "https://mistral.ai/careers",
+      "type": "company",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "hugging-face-jobs",
+      "name": "Hugging Face jobs",
+      "url": "https://huggingface.co/jobs",
+      "type": "company",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "mercor",
+      "name": "Mercor",
+      "url": "https://mercor.com",
+      "type": "platform",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "alignerr",
+      "name": "Alignerr",
+      "url": "https://www.alignerr.com",
+      "type": "platform",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "outlier",
+      "name": "Outlier",
+      "url": "https://outlier.ai",
+      "type": "platform",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "dataannotation",
+      "name": "DataAnnotation",
+      "url": "https://www.dataannotation.tech",
+      "type": "platform",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "turing",
+      "name": "Turing",
+      "url": "https://www.turing.com",
+      "type": "platform",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "toptal",
+      "name": "Toptal",
+      "url": "https://www.toptal.com",
+      "type": "platform",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "upwork",
+      "name": "Upwork",
+      "url": "https://www.upwork.com",
+      "type": "platform",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "wellfound",
+      "name": "Wellfound",
+      "url": "https://wellfound.com",
+      "type": "job board",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "80-000-hours-job-board",
+      "name": "80,000 Hours job board",
+      "url": "https://jobs.80000hours.org",
+      "type": "job board",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "aijobs-net",
+      "name": "aijobs.net",
+      "url": "https://aijobs.net",
+      "type": "job board",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "aitraining-jobs",
+      "name": "AITraining.jobs",
+      "url": "https://aitraining.jobs",
+      "type": "job board",
+      "note": "Aggregator; counts and listings are unverified leads"
+    },
+    {
+      "id": "kaggle-competitions",
+      "name": "Kaggle competitions",
+      "url": "https://www.kaggle.com/competitions",
+      "type": "competition",
+      "note": "Not checked for current openings; verify at the source"
+    },
+    {
+      "id": "devpost-hackathons",
+      "name": "Devpost hackathons",
+      "url": "https://devpost.com/hackathons",
+      "type": "competition",
+      "note": "Not checked for current openings; verify at the source"
+    }
+  ]
+}
