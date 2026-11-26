@@ -51,9 +51,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onUpdateWorkflow,
 }) => {
   const activeItems = opportunities.filter((o) => o.workflowStatus !== 'dismissed');
-  const verifiedLiveCount = activeItems.filter(
-    (o) => o.provenance?.verificationStatus === 'verified'
-  ).length;
+  const feedLeadCount = activeItems.filter((o) => o.source === 'feed').length;
   const demoSeedCount = opportunities.filter(
     (o) => o.provenance?.verificationStatus === 'demo' || o.source === 'seed'
   ).length;
@@ -75,8 +73,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const kpis = [
     {
-      label: 'Verified Live Leads',
-      value: verifiedLiveCount,
+      label: 'Feed Leads (unverified)',
+      value: feedLeadCount,
       sub: `${newCount} new awaiting triage`,
     },
     {
@@ -385,7 +383,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span>{isSyncing ? 'Checking feed...' : 'Check Feed Update'}</span>
               </button>
 
-              {verifiedLiveCount > 0 && demoSeedCount > 0 && (
+              {feedLeadCount > 0 && demoSeedCount > 0 && (
                 <button
                   type="button"
                   onClick={onClearDemoSeeds}

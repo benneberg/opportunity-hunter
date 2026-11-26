@@ -1,3 +1,4 @@
+import {badgeClass, deadlineBadge} from '../lib/deadline';
 import React, {useMemo, useState} from 'react';
 import {ArrowUpDown, Edit3, ExternalLink, FileJson, Plus, Search} from 'lucide-react';
 import type {
@@ -336,6 +337,14 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
                         <>
                           <span aria-hidden="true">·</span>
                           <span className="font-mono tabular-nums">Due {opp.deadline}</span>
+                          {(() => {
+                            const b = deadlineBadge(opp);
+                            return b ? (
+                              <span className={`rounded-full border px-1.5 text-[10px] font-medium ${badgeClass[b.tone]}`}>
+                                {b.label}
+                              </span>
+                            ) : null;
+                          })()}
                         </>
                       )}
                       <span aria-hidden="true">·</span>

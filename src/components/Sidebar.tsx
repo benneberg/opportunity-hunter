@@ -3,6 +3,7 @@ import {
   Briefcase,
   GitBranch,
   LayoutDashboard,
+  Link2,
   Moon,
   SlidersHorizontal,
   Sun,
@@ -16,6 +17,7 @@ interface SidebarProps {
   counts: {
     newCount: number;
     totalCount: number;
+    otherCount: number;
     pipelineCount: number;
   };
   theme: 'light' | 'dark';
@@ -39,6 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }> = [
     {id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, count: counts.newCount},
     {id: 'opportunities', label: 'Opportunities', icon: Briefcase, count: counts.totalCount},
+    {id: 'other', label: 'Other Links & Jobs', icon: Link2, count: counts.otherCount},
     {id: 'pipeline', label: 'Pipeline', icon: GitBranch, count: counts.pipelineCount},
     {id: 'profile', label: 'Profile & Rules', icon: SlidersHorizontal},
   ];
@@ -113,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         aria-label="Mobile navigation"
         className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/95"
       >
-        <div className="grid grid-cols-4 h-14">
+        <div className="grid grid-cols-5 h-14">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.id;

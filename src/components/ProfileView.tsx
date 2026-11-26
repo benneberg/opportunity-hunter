@@ -343,7 +343,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 ['eligibility', 'Eligibility & Location Alignment'],
                 ['preference', 'Opportunity Type & Benefit'],
                 ['technical', 'Technical / AI Systems Depth'],
-                ['urgency', 'Deadline Urgency & Effort Fit'],
+                ['urgency', 'Practical Fit (application effort)'],
               ] as Array<[keyof ScoringWeights, string]>
             ).map(([key, label]) => (
               <div key={key} className="space-y-1">

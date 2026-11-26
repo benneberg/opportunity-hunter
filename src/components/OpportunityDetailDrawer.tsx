@@ -1,3 +1,4 @@
+import {deadlineBadge} from '../lib/deadline';
 import React from 'react';
 import {Edit3, ExternalLink, Trash2, X} from 'lucide-react';
 import type {DeveloperProfile, ExternalStatus, Opportunity, WorkflowStatus} from '../types';
@@ -65,7 +66,7 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
       max: maxDim(profile.weights.technical),
     },
     {
-      label: 'Deadline & Effort Fit',
+      label: 'Practical Fit (effort)',
       earned: opportunity.scoreBreakdown.urgency,
       max: maxDim(profile.weights.urgency),
     },
@@ -107,7 +108,10 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
                 <p className="font-mono">Compensation: {opportunity.compensation}</p>
               )}
               {opportunity.deadline && (
-                <p className="font-mono tabular-nums">Deadline: {opportunity.deadline}</p>
+                <p className="font-mono tabular-nums">
+                  Deadline: {opportunity.deadline}
+                  {deadlineBadge(opportunity) ? ` (${deadlineBadge(opportunity)?.label})` : ''}
+                </p>
               )}
               <p className={`font-medium ${eligibilityTextClass(opportunity.eligibility)}`}>
                 {formatEligibilityLabel(opportunity.eligibility)}
@@ -153,6 +157,17 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
                   ? ` · Verified: ${new Date(opportunity.provenance.lastVerifiedAt).toLocaleString()}`
                   : ''}
               </p>
+            </div>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => onUpdateOpportunity(opportunity.id, toggleUserVerification(opportunity))}
+                className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:border-sky-400 dark:border-slate-700 dark:text-slate-200"
+              >
+                {opportunity.provenance?.verifiedBy === 'user'
+                  ? 'Remove my verification'
+                  : 'I checked this at the source: mark verified'}
+              </button>
             </div>
             {opportunity.eligibilityReason && (
               <p className="text-slate-600 dark:text-slate-300 pt-1 border-t border-slate-200 dark:border-slate-800">
@@ -347,3 +362,15 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
     </div>
   );
 };
+
+function toggleUserVerification(o: Opportunity): Partial<Opportunity> {
+  const base = o.provenance ?? {
+    sourceId: 'manual',
+    sourceName: 'Manual entry',
+    discoveredAt: o.discoveredAt,
+    verificationStatus: 'unverified' as const,
+  };
+  return o.provenance?.verifiedBy === 'user'
+    ? {provenance: {...base, verificationStatus: 'unverified', verifiedBy: undefined, lastVerifiedAt: undefined}}
+    : {provenance: {...base, verificationStatus: 'verified', verifiedBy: 'user', lastVerifiedAt: new Date().toISOString()}};
+}
