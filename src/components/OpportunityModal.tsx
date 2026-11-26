@@ -88,6 +88,9 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
     const cleanDeadline = deadline.trim() || undefined;
     const effectiveExternal = inferExternalStatus(externalStatus, cleanDeadline);
 
+    const nowDate = new Date().toISOString().slice(0, 10);
+    const discoveredAt = editingOpportunity?.discoveredAt || nowDate;
+
     const base = {
       id: editingOpportunity?.id || `manual-${Date.now()}`,
       title: cleanTitle,
@@ -102,9 +105,16 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       workflowStatus,
       summary: sanitizeText(summary, 500),
       notes: sanitizeText(notes, 500) || undefined,
-      discoveredAt: editingOpportunity?.discoveredAt || new Date().toISOString().slice(0, 10),
+      discoveredAt,
+      lastCheckedAt: nowDate,
       updatedAt: new Date().toISOString(),
       source: editingOpportunity?.source || ('manual' as const),
+      provenance: editingOpportunity?.provenance || {
+        sourceId: 'manual',
+        sourceName: 'Manual Entry',
+        discoveredAt,
+        verificationStatus: 'unverified' as const,
+      },
     };
 
     const assessment = scoreOpportunity(base, profile);

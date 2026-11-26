@@ -21,8 +21,41 @@ export type WorkflowStatus =
 export type EligibilityStatus =
   | 'confirmed_eligible'
   | 'likely_eligible'
-  | 'uncertain'
-  | 'ineligible';
+  | 'requires_verification'
+  | 'confirmed_ineligible';
+
+export type VerificationStatus =
+  | 'verified'
+  | 'unverified'
+  | 'unavailable'
+  | 'expired'
+  | 'demo';
+
+export type DeadlineUrgency = 'urgent' | 'normal' | 'open' | 'closed';
+export type ApplicationEffort = 'low' | 'medium' | 'high';
+export type ExpectedValue = 'high' | 'medium' | 'standard';
+
+export type SyncStatus =
+  | 'synced_updated'
+  | 'synced_no_changes'
+  | 'partial_sync'
+  | 'sync_failed'
+  | 'feed_unavailable';
+
+export interface OpportunityProvenance {
+  sourceId: string;
+  sourceName: string;
+  sourceUrl?: string;
+  discoveredAt: string;
+  lastVerifiedAt?: string;
+  verificationStatus: VerificationStatus;
+}
+
+export interface ProjectMatch {
+  projectName: string;
+  reason: string;
+  strength: 'high' | 'medium';
+}
 
 export interface ScoringWeights {
   skills: number;
@@ -61,7 +94,13 @@ export interface ScoreBreakdown {
 
 export interface OpportunityAssessment {
   score: number;
+  opportunityQuality: number;
   eligibility: EligibilityStatus;
+  eligibilityReason: string;
+  deadlineUrgency: DeadlineUrgency;
+  applicationEffort: ApplicationEffort;
+  expectedValue: ExpectedValue;
+  projectMatches: ProjectMatch[];
   scoreBreakdown: ScoreBreakdown;
   matchedSignals: string[];
   missingChecks: string[];
@@ -88,10 +127,12 @@ export interface Opportunity extends OpportunityAssessment {
   dedupeKey?: string;
   updatedAt?: string;
   source?: 'seed' | 'manual' | 'feed' | 'import';
+  provenance?: OpportunityProvenance;
 }
 
 export interface FeedSourceStat {
   id: string;
+  name?: string;
   status: 'ok' | 'error';
   fetched?: number;
   kept?: number;
@@ -102,6 +143,7 @@ export interface FeedSyncStats {
   total: number;
   newlyAdded: number;
   updated: number;
+  syncHealth?: 'healthy' | 'partial' | 'failed';
   sources: FeedSourceStat[];
 }
 
@@ -110,6 +152,8 @@ export interface AppState {
   profile: DeveloperProfile;
   lastFeedSync: string | null;
   feedStats?: FeedSyncStats | null;
+  syncStatus?: SyncStatus;
+  syncError?: string | null;
   theme: 'light' | 'dark';
 }
 

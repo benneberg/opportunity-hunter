@@ -52,8 +52,9 @@ export default function App() {
         setState(loaded);
         const merged = await mergeRemoteFeed(loaded);
         if (!mounted) return;
-        if (merged.addedCount > 0 || merged.updatedCount > 0 || merged.updatedAt !== loaded.lastFeedSync) {
-          setState(merged.state);
+        setState(merged.state);
+        if (merged.status === 'sync_failed' || merged.status === 'partial_sync') {
+          setSyncFeedback(merged.message);
         }
       } catch {
         // Sync initial state remains active
@@ -94,11 +95,19 @@ export default function App() {
     const result = await mergeRemoteFeed(state);
     setState(result.state);
     setIsSyncing(false);
-    setSyncFeedback(
-      result.addedCount > 0 || result.updatedCount > 0
-        ? `Synced feed: ${result.addedCount} new, ${result.updatedCount} refreshed.`
-        : 'Feed checked — no new or updated items beyond current tracker.'
+    setSyncFeedback(result.message);
+  };
+
+  const handleClearDemoSeeds = () => {
+    if (!state) return;
+    const filtered = state.opportunities.filter(
+      (o) => o.provenance?.verificationStatus !== 'demo' && o.source !== 'seed'
     );
+    commitState({
+      ...state,
+      opportunities: filtered,
+    });
+    setSyncFeedback('Removed illustrative demo seed entries.');
   };
 
   const handleUpdateWorkflow = (id: string, workflowStatus: WorkflowStatus) => {
@@ -278,9 +287,13 @@ export default function App() {
             <DashboardView
               opportunities={state.opportunities}
               lastFeedSync={state.lastFeedSync}
+              feedStats={state.feedStats}
+              syncStatus={state.syncStatus}
+              syncError={state.syncError}
               isSyncing={isSyncing}
               syncFeedback={syncFeedback}
               onSyncFeed={() => void handleSyncFeed()}
+              onClearDemoSeeds={handleClearDemoSeeds}
               onNavigate={setActiveTab}
               onSelectOpportunity={(opp) => setInspectingId(opp.id)}
               onUpdateWorkflow={handleUpdateWorkflow}

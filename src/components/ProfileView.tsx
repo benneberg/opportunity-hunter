@@ -418,23 +418,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-950/60 space-y-2 text-xs text-slate-600 dark:text-slate-300">
             <p className="font-semibold text-slate-800 dark:text-slate-200">
-              GitHub Actions Discovery &amp; Adapter Registry
+              GitHub Actions Discovery &amp; Canonical Scoring
             </p>
             <ol className="list-decimal list-inside space-y-1">
               <li>
-                Configure <code className="font-mono text-[11px]">rss</code> (RSS/Atom),{' '}
-                <code className="font-mono text-[11px]">json</code> (Greenhouse/Lever/Ashby), or{' '}
-                <code className="font-mono text-[11px]">grant_program</code> sources in{' '}
+                Live <code className="font-mono text-[11px]">rss</code>,{' '}
+                <code className="font-mono text-[11px]">json</code> (Greenhouse/Remotive), and{' '}
+                <code className="font-mono text-[11px]">grant_program</code> sources run in{' '}
                 <code className="font-mono text-[11px]">scripts/discover.mjs</code>.
               </li>
               <li>
-                Two-tier deduplication normalizes URLs and{' '}
-                <code className="font-mono text-[11px]">organization::title</code> keys across runs, writing{' '}
-                <code className="font-mono text-[11px]">public/data/opportunities.json</code>.
+                Both discovery and this browser UI share{' '}
+                <code className="font-mono text-[11px]">shared/scoring-core.mjs</code> so rankings and eligibility gates stay identical.
               </li>
               <li>
                 Daily discovery runs via{' '}
-                <code className="font-mono text-[11px]">.github/workflows/hunter.yml</code> and deploys via{' '}
+                <code className="font-mono text-[11px]">.github/workflows/hunter.yml</code> and deploys to Pages via{' '}
                 <code className="font-mono text-[11px]">.github/workflows/pages.yml</code>.
               </li>
             </ol>

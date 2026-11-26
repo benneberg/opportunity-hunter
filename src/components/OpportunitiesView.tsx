@@ -15,10 +15,13 @@ import {
 import {
   eligibilityTextClass,
   externalStatusTextClass,
+  formatEffortLabel,
   formatEligibilityLabel,
   formatExternalStatus,
+  formatVerificationLabel,
   formatWorkflowStatus,
   scoreTextClass,
+  verificationTextClass,
 } from '../lib/format';
 
 type SortOption =
@@ -28,6 +31,8 @@ type SortOption =
   | 'discovered_asc'
   | 'org_asc'
   | 'deadline_asc';
+
+type ProvenanceFilter = 'all' | 'verified' | 'hide_demo' | 'manual';
 
 interface OpportunitiesViewProps {
   opportunities: Opportunity[];
@@ -49,6 +54,7 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
   const [eligibilityFilter, setEligibilityFilter] = useState<'all' | EligibilityStatus>('all');
   const [externalFilter, setExternalFilter] = useState<'all' | ExternalStatus>('all');
   const [workflowFilter, setWorkflowFilter] = useState<'all_active' | 'all' | WorkflowStatus>('all_active');
+  const [provenanceFilter, setProvenanceFilter] = useState<ProvenanceFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('score_desc');
 
   const filtered = useMemo(() => {
@@ -66,6 +72,16 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
         if (categoryFilter !== 'all' && opp.category !== categoryFilter) return false;
         if (eligibilityFilter !== 'all' && opp.eligibility !== eligibilityFilter) return false;
         if (externalFilter !== 'all' && opp.externalStatus !== externalFilter) return false;
+
+        const verStatus = opp.provenance?.verificationStatus;
+        if (provenanceFilter === 'verified' && verStatus !== 'verified') return false;
+        if (provenanceFilter === 'hide_demo' && (verStatus === 'demo' || opp.source === 'seed')) {
+          return false;
+        }
+        if (provenanceFilter === 'manual' && opp.source !== 'manual' && opp.source !== 'import') {
+          return false;
+        }
+
         if (!q) return true;
         const hay = [
           opp.title,
@@ -75,6 +91,7 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
           opp.summary,
           opp.tags.join(' '),
           opp.matchedSignals.join(' '),
+          opp.provenance?.sourceName || '',
         ]
           .join(' ')
           .toLowerCase();
@@ -103,7 +120,16 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
           }
         }
       });
-  }, [opportunities, search, categoryFilter, eligibilityFilter, externalFilter, workflowFilter, sortBy]);
+  }, [
+    opportunities,
+    search,
+    categoryFilter,
+    eligibilityFilter,
+    externalFilter,
+    workflowFilter,
+    provenanceFilter,
+    sortBy,
+  ]);
 
   return (
     <div className="space-y-5">
@@ -116,7 +142,7 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search title, organization, skill signal, or location..."
+              placeholder="Search title, organization, skill signal, source, or location..."
               aria-label="Search opportunities"
               className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100"
             />
@@ -142,7 +168,7 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
           <select
             aria-label="Filter by category"
             value={categoryFilter}
@@ -166,8 +192,20 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
             <option value="all">All eligibility</option>
             <option value="confirmed_eligible">Confirmed Eligible</option>
             <option value="likely_eligible">Likely Eligible</option>
-            <option value="uncertain">Uncertain Eligibility</option>
-            <option value="ineligible">Ineligible</option>
+            <option value="requires_verification">Requires Verification</option>
+            <option value="confirmed_ineligible">Confirmed Ineligible</option>
+          </select>
+
+          <select
+            aria-label="Filter by provenance"
+            value={provenanceFilter}
+            onChange={(e) => setProvenanceFilter(e.target.value as ProvenanceFilter)}
+            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          >
+            <option value="all">All sources</option>
+            <option value="verified">Verified live only</option>
+            <option value="hide_demo">Hide demo seeds</option>
+            <option value="manual">Manual / JSON import</option>
           </select>
 
           <select
@@ -241,6 +279,7 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
                 setCategoryFilter('all');
                 setEligibilityFilter('all');
                 setExternalFilter('all');
+                setProvenanceFilter('all');
                 setWorkflowFilter('all_active');
               }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
@@ -272,6 +311,16 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
 
                     {/* Zero-pill inline metadata */}
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                      <span className={`font-medium ${verificationTextClass(opp.provenance?.verificationStatus)}`}>
+                        {formatVerificationLabel(opp.provenance?.verificationStatus)}
+                      </span>
+                      {opp.provenance?.sourceName && (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span>{opp.provenance.sourceName}</span>
+                        </>
+                      )}
+                      <span aria-hidden="true">·</span>
                       <span>{opp.category}</span>
                       <span aria-hidden="true">·</span>
                       <span>{opp.location}</span>
@@ -309,7 +358,19 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
                       <span className="text-slate-700 dark:text-slate-300">
                         Stage: {formatWorkflowStatus(opp.workflowStatus)}
                       </span>
+                      <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">
+                        /
+                      </span>
+                      <span className="text-slate-500 dark:text-slate-400">
+                        Effort: {formatEffortLabel(opp.applicationEffort)}
+                      </span>
                     </div>
+
+                    {opp.projectMatches && opp.projectMatches.length > 0 && (
+                      <p className="text-xs text-sky-700 dark:text-sky-400">
+                        Project fit: {opp.projectMatches.map((p) => p.projectName).join(' · ')}
+                      </p>
+                    )}
 
                     {opp.summary && (
                       <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-3xl">
@@ -337,7 +398,7 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
                         <span className="font-mono text-xs text-slate-400">/100</span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                        S:{opp.scoreBreakdown.skills} · E:{opp.scoreBreakdown.eligibility} · T:{opp.scoreBreakdown.technical}
+                        Q:{opp.opportunityQuality} · S:{opp.scoreBreakdown.skills} · E:{opp.scoreBreakdown.eligibility}
                       </p>
                     </div>
 
@@ -370,15 +431,16 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({
                           Save
                         </button>
                       )}
-                      {opp.workflowStatus !== 'applied' && opp.eligibility !== 'ineligible' && (
-                        <button
-                          type="button"
-                          onClick={() => onUpdateWorkflow(opp.id, 'applied')}
-                          className="rounded-md border border-sky-600/30 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:bg-sky-500/20 whitespace-nowrap"
-                        >
-                          Mark Applied
-                        </button>
-                      )}
+                      {opp.workflowStatus !== 'applied' &&
+                        opp.eligibility !== 'confirmed_ineligible' && (
+                          <button
+                            type="button"
+                            onClick={() => onUpdateWorkflow(opp.id, 'applied')}
+                            className="rounded-md border border-sky-600/30 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:bg-sky-500/20 whitespace-nowrap"
+                          >
+                            Mark Applied
+                          </button>
+                        )}
                       {opp.workflowStatus !== 'dismissed' && (
                         <button
                           type="button"

@@ -1,0 +1,84 @@
+{
+  "name": "Independent AI Systems Developer",
+  "positioning": "AI systems development, model evaluation, and human-in-the-loop failure analysis — independent builder shipping developer tooling and diagnosing model failure modes.",
+  "primaryLocation": "Sweden",
+  "skills": [
+    "llm",
+    "model evaluation",
+    "evaluation",
+    "agents",
+    "agentic",
+    "typescript",
+    "python",
+    "iot",
+    "debugging",
+    "ast",
+    "developer tooling",
+    "failure analysis",
+    "human-in-the-loop",
+    "benchmark",
+    "red-team"
+  ],
+  "preferredLocations": [
+    "Sweden",
+    "Stockholm",
+    "Gothenburg",
+    "Nordic",
+    "Europe",
+    "EU",
+    "EEA",
+    "Remote",
+    "International",
+    "Worldwide",
+    "Global"
+  ],
+  "blockedLocations": [
+    "us-only",
+    "us only",
+    "united states only",
+    "must reside in the us",
+    "us citizen only",
+    "us security clearance",
+    "on-site san francisco",
+    "on-site new york"
+  ],
+  "preferredCategories": [
+    "Research & Model Evaluation",
+    "Recruitment & Contracting",
+    "Early Access & Credits",
+    "Grants & Competitions"
+  ],
+  "flagshipProjects": [
+    {
+      "id": "proj-contextcompiler",
+      "name": "ContextCompiler",
+      "focus": "AST-aware context packing, deterministic code-graph indexing, and developer tooling.",
+      "keywords": ["ast", "compiler", "context", "developer tooling", "typescript", "codebase", "static analysis", "indexing"]
+    },
+    {
+      "id": "proj-lena",
+      "name": "Lena AI 2.0",
+      "focus": "Multi-step agent orchestration, tool-use evaluation, and failure-mode diagnostics.",
+      "keywords": ["agents", "agentic", "llm", "model evaluation", "failure analysis", "orchestration", "human-in-the-loop", "reliability"]
+    },
+    {
+      "id": "proj-minicodi",
+      "name": "MiniCodi",
+      "focus": "Lightweight autonomous coding assistant and automated patch verification harness.",
+      "keywords": ["coding", "code generation", "debugging", "patch", "benchmark", "python", "typescript", "swe-bench"]
+    },
+    {
+      "id": "proj-insikt",
+      "name": "INSIKT",
+      "focus": "IoT telemetry analysis, anomaly detection, and structured operational insight pipelines.",
+      "keywords": ["iot", "telemetry", "anomaly", "systems", "monitoring", "sweden", "edge", "observability"]
+    }
+  ],
+  "weights": {
+    "skills": 30,
+    "eligibility": 25,
+    "preference": 20,
+    "technical": 15,
+    "urgency": 10
+  }
+}

@@ -1,22 +1,36 @@
 import React from 'react';
-import {ArrowRight, ExternalLink, RefreshCw} from 'lucide-react';
-import type {ActiveTab, Opportunity, WorkflowStatus} from '../types';
+import {ArrowRight, ExternalLink, RefreshCw, Trash2} from 'lucide-react';
+import type {
+  ActiveTab,
+  FeedSyncStats,
+  Opportunity,
+  SyncStatus,
+  WorkflowStatus,
+} from '../types';
 import {
   eligibilityTextClass,
   externalStatusTextClass,
   formatEligibilityLabel,
   formatExternalStatus,
+  formatSyncStatusLabel,
+  formatVerificationLabel,
   formatWorkflowStatus,
   scoreTextClass,
+  syncStatusTextClass,
+  verificationTextClass,
 } from '../lib/format';
 import {daysUntilDeadline} from '../lib/scoring';
 
 interface DashboardViewProps {
   opportunities: Opportunity[];
   lastFeedSync: string | null;
+  feedStats?: FeedSyncStats | null;
+  syncStatus?: SyncStatus;
+  syncError?: string | null;
   isSyncing: boolean;
   syncFeedback: string | null;
   onSyncFeed: () => void;
+  onClearDemoSeeds: () => void;
   onNavigate: (tab: ActiveTab) => void;
   onSelectOpportunity: (opp: Opportunity) => void;
   onUpdateWorkflow: (id: string, status: WorkflowStatus) => void;
@@ -25,17 +39,32 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   opportunities,
   lastFeedSync,
+  feedStats,
+  syncStatus,
+  syncError,
   isSyncing,
   syncFeedback,
   onSyncFeed,
+  onClearDemoSeeds,
   onNavigate,
   onSelectOpportunity,
   onUpdateWorkflow,
 }) => {
   const activeItems = opportunities.filter((o) => o.workflowStatus !== 'dismissed');
+  const verifiedLiveCount = activeItems.filter(
+    (o) => o.provenance?.verificationStatus === 'verified'
+  ).length;
+  const demoSeedCount = opportunities.filter(
+    (o) => o.provenance?.verificationStatus === 'demo' || o.source === 'seed'
+  ).length;
   const newCount = activeItems.filter((o) => o.workflowStatus === 'new').length;
   const strongMatches = activeItems
-    .filter((o) => o.score >= 78 && o.eligibility !== 'ineligible' && o.externalStatus !== 'closed')
+    .filter(
+      (o) =>
+        o.score >= 70 &&
+        o.eligibility !== 'confirmed_ineligible' &&
+        o.externalStatus !== 'closed'
+    )
     .sort((a, b) => b.score - a.score);
   const closingSoon = activeItems
     .filter((o) => o.externalStatus === 'closing_soon')
@@ -45,16 +74,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ).length;
 
   const kpis = [
-    {label: 'New Leads', value: newCount, sub: 'Awaiting initial triage'},
-    {label: 'Strong Matches', value: strongMatches.length, sub: 'Score 78+ and eligible'},
-    {label: 'Closing Soon', value: closingSoon.length, sub: 'Within 14-day window'},
-    {label: 'Active Pipeline', value: activePipelineCount, sub: 'Saved through interview'},
+    {
+      label: 'Verified Live Leads',
+      value: verifiedLiveCount,
+      sub: `${newCount} new awaiting triage`,
+    },
+    {
+      label: 'Strong Matches',
+      value: strongMatches.length,
+      sub: 'Score 70+ & not excluded',
+    },
+    {
+      label: 'Closing Soon',
+      value: closingSoon.length,
+      sub: 'Within 14-day window',
+    },
+    {
+      label: 'Active Pipeline',
+      value: activePipelineCount,
+      sub: 'Saved through interview',
+    },
   ];
 
-  const topMatches = [...activeItems]
-    .filter((o) => o.eligibility !== 'ineligible' && o.externalStatus !== 'closed')
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+  // Prefer verified live / manual items in top matches when available; demo seeds only shown if needed or clearly labeled
+  const eligiblePool = activeItems.filter(
+    (o) => o.eligibility !== 'confirmed_ineligible' && o.externalStatus !== 'closed'
+  );
+  const liveOrManual = eligiblePool.filter(
+    (o) => o.provenance?.verificationStatus !== 'demo' && o.source !== 'seed'
+  );
+  const topMatches = (liveOrManual.length > 0 ? liveOrManual : eligiblePool)
+    .slice()
+    .sort((a, b) => b.score - a.score || b.opportunityQuality - a.opportunityQuality)
+    .slice(0, 6);
 
   return (
     <div className="space-y-8">
@@ -84,7 +136,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Top Eligible Matches
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Ranked deterministically across skills, Sweden/remote eligibility, and AI systems depth
+                {liveOrManual.length > 0
+                  ? 'Ranked across verified live feeds and manual leads (excluding demo seeds)'
+                  : 'Showing illustrative demo seeds — sync live feed to replace with verified sources'}
               </p>
             </div>
             <button
@@ -100,7 +154,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {topMatches.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                No eligible active matches found. Adjust rules or add a new opportunity.
+                No eligible active matches found. Adjust rules or check feed updates.
               </p>
             </div>
           ) : (
@@ -126,6 +180,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                        <span className={`font-medium ${verificationTextClass(opp.provenance?.verificationStatus)}`}>
+                          {formatVerificationLabel(opp.provenance?.verificationStatus)}
+                        </span>
+                        <span aria-hidden="true">·</span>
                         <span>{opp.category}</span>
                         <span aria-hidden="true">·</span>
                         <span>{opp.location}</span>
@@ -139,13 +197,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </span>
                       </div>
 
+                      {opp.projectMatches && opp.projectMatches.length > 0 && (
+                        <p className="text-xs text-sky-700 dark:text-sky-400">
+                          Project fit: {opp.projectMatches.map((p) => p.projectName).join(', ')}
+                        </p>
+                      )}
+
                       <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                         Next action: {opp.nextAction}
                       </p>
 
                       {opp.missingChecks.length > 0 && (
                         <p className="text-xs text-amber-700 dark:text-amber-400">
-                          Verify: {opp.missingChecks.join(' · ')}
+                          Verify: {opp.missingChecks.slice(0, 2).join(' · ')}
                         </p>
                       )}
                     </div>
@@ -163,6 +227,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span className="font-mono text-xs text-slate-400 dark:text-slate-500">
                           /100
                         </span>
+                        <p className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                          Quality {opp.opportunityQuality}
+                        </p>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -258,28 +325,77 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   Discovery Feed Sync
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Reads static <code className="font-mono">./data/opportunities.json</code> generated by GitHub Actions.
+                  Reads <code className="font-mono">data/opportunities.json</code> generated from curated live feeds.
                 </p>
               </div>
+              <span className={`text-xs font-medium whitespace-nowrap ${syncStatusTextClass(syncStatus)}`}>
+                {formatSyncStatusLabel(syncStatus)}
+              </span>
             </div>
 
             <div className="text-xs text-slate-600 dark:text-slate-300 font-mono tabular-nums">
               Last sync: {lastFeedSync ? new Date(lastFeedSync).toLocaleString() : 'Not yet synced'}
             </div>
 
+            {feedStats && feedStats.sources && feedStats.sources.length > 0 && (
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-2.5 space-y-1">
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Source Health ({feedStats.total} items in feed)
+                </p>
+                <div className="space-y-1">
+                  {feedStats.sources.map((src) => (
+                    <div
+                      key={src.id}
+                      className="flex items-center justify-between text-[11px] font-mono tabular-nums"
+                    >
+                      <span className="text-slate-600 dark:text-slate-300 truncate pr-2">
+                        {src.name || src.id}
+                      </span>
+                      <span
+                        className={
+                          src.status === 'ok'
+                            ? 'text-emerald-700 dark:text-emerald-400 shrink-0'
+                            : 'text-rose-600 dark:text-rose-400 shrink-0'
+                        }
+                      >
+                        {src.status === 'ok' ? `${src.kept ?? 0} kept` : 'error'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {syncError && (
+              <p className="text-xs text-rose-600 dark:text-rose-400">{syncError}</p>
+            )}
+
             {syncFeedback && (
               <p className="text-xs text-sky-700 dark:text-sky-300">{syncFeedback}</p>
             )}
 
-            <button
-              type="button"
-              onClick={onSyncFeed}
-              disabled={isSyncing}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Checking feed...' : 'Check Feed Update'}</span>
-            </button>
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={onSyncFeed}
+                disabled={isSyncing}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Checking feed...' : 'Check Feed Update'}</span>
+              </button>
+
+              {verifiedLiveCount > 0 && demoSeedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={onClearDemoSeeds}
+                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-rose-700 hover:border-rose-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-rose-400 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Remove {demoSeedCount} Demo Seed Examples</span>
+                </button>
+              )}
+            </div>
           </section>
         </div>
       </div>

@@ -6,7 +6,11 @@ import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
+  const base = process.env.VITE_BASE_PATH || '/';
+  const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+
   return {
+    base: normalizedBase,
     plugins: [
       react(),
       tailwindcss(),
@@ -14,30 +18,30 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png'],
         manifest: {
-          id: '/',
+          id: normalizedBase,
           name: 'Opportunity Hunter',
           short_name: 'OppHunter',
           description: 'Personal AI opportunity intelligence SPA PWA for tracking technical evaluation, research, grants, and remote contracting opportunities.',
           theme_color: '#0B111E',
           background_color: '#0B111E',
           display: 'standalone',
-          start_url: '/',
-          scope: '/',
+          start_url: normalizedBase,
+          scope: normalizedBase,
           icons: [
             {
-              src: '/pwa-192x192.png',
+              src: `${normalizedBase}pwa-192x192.png`,
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-512x512.png',
+              src: `${normalizedBase}pwa-512x512.png`,
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-maskable-512x512.png',
+              src: `${normalizedBase}pwa-maskable-512x512.png`,
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',

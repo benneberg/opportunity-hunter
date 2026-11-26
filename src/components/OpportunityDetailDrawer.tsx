@@ -5,10 +5,14 @@ import {EXTERNAL_STATUSES, WORKFLOW_STATUSES} from '../lib/scoring';
 import {
   eligibilityTextClass,
   externalStatusTextClass,
+  formatEffortLabel,
   formatEligibilityLabel,
+  formatExpectedValue,
   formatExternalStatus,
+  formatVerificationLabel,
   formatWorkflowStatus,
   scoreTextClass,
+  verificationTextClass,
 } from '../lib/format';
 
 interface OpportunityDetailDrawerProps {
@@ -108,10 +112,14 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
               <p className={`font-medium ${eligibilityTextClass(opportunity.eligibility)}`}>
                 {formatEligibilityLabel(opportunity.eligibility)}
               </p>
+              <p className="text-slate-500 dark:text-slate-400">
+                Effort: {formatEffortLabel(opportunity.applicationEffort)} · Value:{' '}
+                {formatExpectedValue(opportunity.expectedValue)}
+              </p>
             </div>
 
-            <div className="text-right">
-              <p className="text-xs text-slate-500 dark:text-slate-400">Baseline Fit</p>
+            <div className="text-right shrink-0">
+              <p className="text-xs text-slate-500 dark:text-slate-400">Composite Score</p>
               <p
                 className={`font-mono text-3xl font-semibold tabular-nums ${scoreTextClass(
                   opportunity.score,
@@ -121,8 +129,37 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
                 {opportunity.score}
                 <span className="text-sm text-slate-400">/100</span>
               </p>
+              <p className="font-mono text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                Quality {opportunity.opportunityQuality}/100
+              </p>
             </div>
           </div>
+
+          {/* Eligibility & Provenance */}
+          <section className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-950/60 space-y-2 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                Source &amp; Provenance
+              </span>
+              <span className={`font-medium ${verificationTextClass(opportunity.provenance?.verificationStatus)}`}>
+                {formatVerificationLabel(opportunity.provenance?.verificationStatus)}
+              </span>
+            </div>
+            <div className="text-slate-600 dark:text-slate-300 space-y-0.5 font-mono text-[11px]">
+              <p>Source: {opportunity.provenance?.sourceName || opportunity.source || 'Unknown'}</p>
+              <p>
+                Discovered: {opportunity.provenance?.discoveredAt || opportunity.discoveredAt}
+                {opportunity.provenance?.lastVerifiedAt
+                  ? ` · Verified: ${new Date(opportunity.provenance.lastVerifiedAt).toLocaleString()}`
+                  : ''}
+              </p>
+            </div>
+            {opportunity.eligibilityReason && (
+              <p className="text-slate-600 dark:text-slate-300 pt-1 border-t border-slate-200 dark:border-slate-800">
+                Eligibility rationale: {opportunity.eligibilityReason}
+              </p>
+            )}
+          </section>
 
           {/* Explainable Score Breakdown */}
           <section className="space-y-3">
@@ -151,6 +188,31 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
               })}
             </div>
           </section>
+
+          {/* Project-Specific Relevance */}
+          {opportunity.projectMatches && opportunity.projectMatches.length > 0 && (
+            <section className="space-y-2 text-xs">
+              <p className="font-semibold text-slate-700 dark:text-slate-300">
+                Flagship Project Relevance
+              </p>
+              <div className="space-y-1.5">
+                {opportunity.projectMatches.map((pm) => (
+                  <div
+                    key={pm.projectName}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60"
+                  >
+                    <p className="font-semibold text-sky-700 dark:text-sky-400">
+                      {pm.projectName}{' '}
+                      <span className="font-normal text-slate-500 dark:text-slate-400">
+                        ({pm.strength} relevance)
+                      </span>
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-300 mt-0.5">{pm.reason}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Signals & Checks */}
           <section className="space-y-3 text-xs">

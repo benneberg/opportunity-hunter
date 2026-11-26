@@ -21,7 +21,7 @@ jobs:
           node-version: "22"
 
       - name: Run discovery & scoring
-        run: npm run discover
+        run: node scripts/discover.mjs
 
       - name: Commit updated opportunity feed
         run: |
@@ -29,6 +29,6 @@ jobs:
           git config user.email "bot@users.noreply.github.com"
           git add public/data/opportunities.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore(data): update discovered opportunities [skip ci]"
+            git commit -m "chore(data): update discovered opportunities"
             git push
           fi

@@ -5,11 +5,14 @@ on:
     branches: ["main"]
     paths:
       - "src/**"
+      - "shared/**"
       - "public/**"
-      - "scripts/**"
       - "index.html"
       - "vite.config.ts"
       - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -35,16 +38,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
 
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm ci
+
+      - name: Type check
+        run: npm run lint
 
       - name: Build static PWA
+        env:
+          VITE_BASE_PATH: ${{ github.event.repository.name == format('{0}.github.io', github.repository_owner) && '/' || format('/{0}/', github.event.repository.name) }}
         run: npm run build
 
       - name: Upload artifact
