@@ -83,6 +83,7 @@ const SOURCES = [
   },
   {
     id: "huggingface-blog",
+    kind: "announcement",
     name: "Hugging Face",
     adapter: "rss",
     url: "https://huggingface.co/blog/feed.xml",
@@ -93,6 +94,7 @@ const SOURCES = [
   },
   {
     id: "openai-news",
+    kind: "announcement",
     name: "OpenAI",
     adapter: "rss",
     url: "https://openai.com/news/rss.xml",
@@ -163,7 +165,7 @@ async function fetchRssAdapter(source) {
       title,
       organization: source.name,
       category: source.defaultCategory || "Recruitment & Contracting",
-      location: source.defaultLocation || "Remote / Check listing",
+      location: source.defaultLocation || "Not stated (check listing)",
       url: sanitizeUrl(link) || source.url,
       summary: sanitizeText(rawDesc, 320),
       tags: [source.id, "rss"],
@@ -296,13 +298,35 @@ function loadExistingFeed() {
   return { updatedAt: null, items: [] };
 }
 
+function loadLeads() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.resolve("public/data/leads.json"), "utf8"));
+    return {
+      leads: Array.isArray(raw.leads) ? raw.leads : [],
+      resources: Array.isArray(raw.resources) ? raw.resources : []
+    };
+  } catch {
+    return { leads: [], resources: [] };
+  }
+}
+
 async function run() {
   const previous = loadExistingFeed();
   const byDedupeKey = new Map();
 
   for (const item of previous.items) {
     const key = item.dedupeKey || buildDedupeKey(item);
-    byDedupeKey.set(key, { ...item, dedupeKey: key });
+    const srcDef = SOURCES.find((s) => s.id === item.provenance?.sourceId);
+    const provenance = { ...(item.provenance || {}) };
+    // Feed items are never verified by the pipeline; only the user can verify in the app.
+    provenance.verificationStatus = "unverified";
+    delete provenance.lastVerifiedAt;
+    byDedupeKey.set(key, {
+      ...item,
+      dedupeKey: key,
+      itemType: srcDef?.kind === "announcement" ? "announcement" : item.itemType || "opportunity",
+      provenance
+    });
   }
 
   const nowIso = new Date().toISOString();
@@ -332,10 +356,11 @@ async function run() {
         const baseRecord = {
           id: existing?.id || `opp-${hashId(dedupeKey)}`,
           dedupeKey,
+          itemType: source.kind === "announcement" ? "announcement" : "opportunity",
           title: candidate.title || existing?.title || "Untitled",
           organization: candidate.organization || existing?.organization || source.name,
           category: candidate.category || existing?.category || source.defaultCategory,
-          location: candidate.location || existing?.location || "Remote / Check listing",
+          location: candidate.location || existing?.location || "Not stated (check listing)",
           url: candidate.url || existing?.url || source.url,
           compensation: candidate.compensation || existing?.compensation,
           deadline: candidate.deadline || existing?.deadline,
@@ -351,8 +376,7 @@ async function run() {
             sourceName: source.name,
             sourceUrl: source.url,
             discoveredAt: existing?.provenance?.discoveredAt || existing?.discoveredAt || today,
-            lastVerifiedAt: nowIso,
-            verificationStatus: "verified"
+            verificationStatus: "unverified"
           }
         };
 
@@ -384,6 +408,47 @@ async function run() {
     }
   }
 
+  // Curated, hand-maintained leads and resource links (public/data/leads.json).
+  // Leads are never marked verified; they are starting points to check at the source.
+  const leadsFile = loadLeads();
+  for (const lead of leadsFile.leads) {
+    const dedupeKey = buildDedupeKey({ title: lead.title, organization: lead.organization, url: lead.url || "" });
+    const existing = byDedupeKey.get(dedupeKey);
+    const baseRecord = {
+      id: existing?.id || `lead-${hashId(dedupeKey)}`,
+      dedupeKey,
+      itemType: "opportunity",
+      title: lead.title,
+      organization: lead.organization,
+      category: lead.category,
+      location: lead.location || "Not stated (check listing)",
+      url: lead.url || "",
+      compensation: lead.compensation,
+      summary: lead.summary || "",
+      tags: (lead.tags || []).slice(0, 10),
+      externalStatus: lead.externalStatus || "unknown",
+      excludedRegions: lead.excludedRegions,
+      eligibilityNote: lead.eligibilityNote,
+      workflowStatus: existing?.workflowStatus || "new",
+      discoveredAt: existing?.discoveredAt || today,
+      lastCheckedAt: today,
+      source: "feed",
+      provenance: {
+        sourceId: "curated-leads",
+        sourceName: "Curated leads (from research notes)",
+        sourceUrl: lead.url || undefined,
+        discoveredAt: existing?.discoveredAt || today,
+        verificationStatus: "unverified"
+      }
+    };
+    byDedupeKey.set(dedupeKey, { ...baseRecord, ...scoreOpportunity(baseRecord, PROFILE) });
+    if (existing) updatedCount++;
+    else newlyAdded++;
+  }
+
+  // Re-score everything so older records always reflect the current scoring rules.
+  for (const [k, v] of byDedupeKey) byDedupeKey.set(k, { ...v, ...scoreOpportunity(v, PROFILE) });
+
   const mergedItems = [...byDedupeKey.values()].sort((a, b) => {
     if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
     return String(b.discoveredAt || "").localeCompare(String(a.discoveredAt || ""));
@@ -406,6 +471,7 @@ async function run() {
       syncHealth,
       sources: sourceStats
     },
+    resources: leadsFile.resources,
     items: mergedItems
   };
 
