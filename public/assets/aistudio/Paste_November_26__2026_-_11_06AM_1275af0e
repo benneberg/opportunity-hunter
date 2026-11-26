@@ -1,0 +1,757 @@
+Thoughts & Architectural Suggestions
+Your framing hits three strong angles: AI systems development, model evaluation, and human-in-the-loop failure analysis. Framing yourself as an independent builder who ships tools and diagnoses model failure modes—rather than a generic prompt writer—gives you stronger leverage for technical evaluation, research participation, and early-access programs while keeping Sweden eligibility prioritized and international/remote options visible.
+Practical Architecture for GitHub Pages + GitHub Actions + SPA PWA
+ * Split static hosting from scheduled discovery: GitHub Pages serves static files only. Use a GitHub Actions scheduled workflow (schedule cron + workflow_dispatch) to fetch/normalize opportunities, run deterministic scoring, and publish a static data/opportunities.json file (either committed to the repo or artifact-deployed with the PWA).
+ * Client-side state with IndexedDB + localStorage: Keep personal profile data, custom scoring weights, application stages, notes, and dismissed/saved states in browser storage (IndexedDB with localStorage fallback), plus one-click JSON export/import. No external database is needed for a personal v1.
+ * Alerts without a custom server: Use GitHub Actions to open/update a GitHub Issue or send a webhook/email digest when high-match items or closing deadlines appear. Add Web Push later once core triage works.
+ * PRD cleanup suggestions:
+   * Unify the scoring weights between the notes and PRD sections (use one deterministic baseline formula with explicit eligibility status so ineligible items never masquerade as top matches).
+   * Keep external web text strictly as untrusted data (never execute instructions found inside scraped descriptions).
+   * Ship a working manual + sample-seeded + JSON-ingestable SPA PWA first, then wire live GitHub Actions feeds incrementally.
+prd.md
+# Opportunity Hunter — Product Requirements Document (v1.0)
+
+**Product Type:** Client-Side SPA PWA + GitHub Actions Discovery Pipeline  
+**Deployment Target:** GitHub Pages (Static PWA) + GitHub Actions (Scheduled Jobs)  
+**Primary User:** Independent AI developer seeking technical evaluation, research, early access, grants, fellowships, and remote/international opportunities (Sweden-prioritized).
+
+---
+
+## 1. Goals & Non-Goals
+
+### Goals
+- Maintain a structured developer profile, projects, and target preferences in the browser (`IndexedDB` / `localStorage`) with JSON backup/restore.
+- Manage opportunities across categories (**Recruitment & Contracting**, **Research & Model Evaluation**, **Early Access & Credits**, **Grants & Competitions**, **Partnerships**, **Community & Fellowships**).
+- Score opportunities deterministically and transparently across skills, eligibility/geography, opportunity type, compensation/benefits, and deadline urgency.
+- Separate **external opportunity status** (`open`, `closing_soon`, `closed`, `unknown`) from **personal workflow status** (`new`, `saved`, `preparing`, `applied`, `interview`, `accepted`, `rejected`, `dismissed`).
+- Support scheduled background discovery via GitHub Actions writing `data/opportunities.json` and deploying to GitHub Pages.
+
+### Non-Goals (v1)
+- Automated form submission or applying on the user's behalf.
+- Unbounded web crawling or bypassing site access controls.
+- Server-side multi-user accounts or a mandatory external SQL database.
+- Fabricating experience, credentials, or eligibility certainty when evidence is missing.
+
+---
+
+## 2. Scoring & Eligibility Rules
+
+- **Eligibility Gate:** Hard geographic/work exclusions (for example, US-only in-person requirement when ineligible) cap or flag fit clearly rather than hiding potential future/international leads unless excluded by user filter. Unknown eligibility stays `uncertain` (never assumed eligible).
+- **Deterministic Baseline Score (0–100):**
+  - Skill & experience overlap: `30%`
+  - Eligibility & location alignment (Sweden priority + remote/international): `25%`
+  - Opportunity type & benefit preference: `20%`
+  - Technical / AI systems relevance: `15%`
+  - Deadline urgency & effort fit: `10%`
+- **Explainability:** Every scored opportunity exposes matched signals, missing/uncertain checks, and a concrete next action.
+
+---
+
+## 3. Core Screens & PWA Features
+
+1. **Dashboard:** Summary counts (`New`, `Strong Matches`, `Closing Soon`, `Active Pipeline`), top matches, and next actions.
+2. **Opportunities:** Filter by category, eligibility, status, and keyword; add/edit opportunities manually or paste JSON; save or dismiss.
+3. **Pipeline:** Track status transitions, deadlines, and notes per opportunity.
+4. **Profile & Rules:** Edit skills, flagship projects (such as ContextCompiler, Lena AI 2.0, MiniCodi, INSIKT), location/remote rules, and JSON import/export.
+5. **PWA & Actions:** Installable manifest, service worker offline cache, build/deploy script, and scheduled GitHub Actions workflow.
+
+Client-Side SPA PWA + Build/Deploy Script + GitHub Actions
+Create this layout in a repository (for example opportunity-hunter):
+.
+├── .github/
+│   └── workflows/
+│       ├── hunter.yml
+│       └── pages.yml
+├── scripts/
+│   ├── discover.mjs
+│   └── build-and-deploy.sh
+├── src/
+│   ├── index.html
+│   ├── manifest.json
+│   ├── sw.js
+│   ├── styles.css
+│   └── app.js
+└── package.json
+
+package.json
+{
+  "name": "opportunity-hunter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "discover": "node scripts/discover.mjs",
+    "build": "node scripts/discover.mjs && ./scripts/build-and-deploy.sh --build-only",
+    "deploy": "./scripts/build-and-deploy.sh"
+  }
+}
+
+scripts/discover.mjs
+Runs in GitHub Actions (or locally) to fetch RSS/JSON feeds from a curated source list, normalize items, compute deterministic relevance against your profile, and write dist/data/opportunities.json (and src/data/opportunities.json for local dev).
+import fs from "node:fs";
+import path from "node:path";
+
+const SOURCES = [
+  // Add verified RSS/Atom or JSON endpoints here, e.g.:
+  // { id: "anthropic-eng", name: "Anthropic Jobs", type: "rss", url: "https://...", category: "Recruitment & Contracting", regionHint: "international" }
+];
+
+const PROFILE = {
+  skills: ["llm", "evaluation", "agents", "typescript", "python", "iot", "debugging", "ast", "developer-tooling"],
+  preferredLocations: ["remote", "sweden", "europe", "international"],
+  blockedLocations: []
+};
+
+function scoreOpportunity(item) {
+  const text = `${item.title} ${item.summary} ${(item.tags || []).join(" ")}`.toLowerCase();
+  const matchedSkills = PROFILE.skills.filter((s) => text.includes(s));
+  const skillScore = Math.min(30, Math.round((matchedSkills.length / 4) * 30));
+
+  const loc = (item.location || "unknown").toLowerCase();
+  let eligibility = "uncertain";
+  let eligScore = 10;
+
+  if (PROFILE.blockedLocations.some((b) => loc.includes(b))) {
+    eligibility = "ineligible";
+    eligScore = 0;
+  } else if (loc.includes("sweden") || loc.includes("remote") || loc.includes("international")) {
+    eligibility = loc.includes("sweden") ? "confirmed_eligible" : "likely_eligible";
+    eligScore = loc.includes("sweden") ? 25 : 20;
+  }
+
+  const prefScore = 15;
+  const techScore = matchedSkills.length > 0 ? 15 : 6;
+  const urgencyScore = 7;
+  const total = Math.min(100, skillScore + eligScore + prefScore + techScore + urgencyScore);
+
+  return {
+    score: total,
+    eligibility,
+    matchedSkills,
+    rationale: `Matched [${matchedSkills.join(", ") || "general AI"}] · Eligibility: ${eligibility}`
+  };
+}
+
+function parseRssItems(xml, source) {
+  const itemMatches = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
+  return itemMatches.map((m, idx) => {
+    const block = m[1];
+    const title = (block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i)?.[1] || "Untitled").trim();
+    const link = (block.match(/<link>([\s\S]*?)<\/link>/i)?.[1] || source.url).trim();
+    const desc = (block.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i)?.[1] || "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return {
+      id: `${source.id}-${idx}-${Buffer.from(link).toString("base64url").slice(0, 10)}`,
+      title,
+      organization: source.name,
+      category: source.category || "Recruitment & Contracting",
+      location: source.location || "Remote / Check listing",
+      url: link,
+      summary: desc.slice(0, 280),
+      tags: [source.id],
+      externalStatus: "open",
+      workflowStatus: "new",
+      discoveredAt: new Date().toISOString().slice(0, 10)
+    };
+  });
+}
+
+async function run() {
+  const discovered = [];
+
+  for (const src of SOURCES) {
+    try {
+      const res = await fetch(src.url, { headers: { "User-Agent": "OpportunityHunterBot/1.0" } });
+      if (!res.ok) continue;
+      const body = await res.text();
+      const parsed = src.type === "rss" ? parseRssItems(body, src) : [];
+      for (const item of parsed) {
+        const assessment = scoreOpportunity(item);
+        discovered.push({ ...item, ...assessment });
+      }
+    } catch (err) {
+      console.warn(`Source fetch skipped (${src.id}):`, err.message);
+    }
+  }
+
+  const outPaths = [
+    path.resolve("src/data/opportunities.json"),
+    path.resolve("dist/data/opportunities.json")
+  ];
+
+  for (const out of outPaths) {
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, JSON.stringify({ updatedAt: new Date().toISOString(), items: discovered }, null, 2));
+  }
+
+  console.log(`Discovery complete. Items processed: ${discovered.length}`);
+}
+
+run();
+
+scripts/build-and-deploy.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+BUILD_ONLY=false
+if [[ "${1:-}" == "--build-only" ]]; then
+  BUILD_ONLY=true
+fi
+
+rm -rf dist
+mkdir -p dist/data
+
+cp src/index.html dist/index.html
+cp src/manifest.json dist/manifest.json
+cp src/sw.js dist/sw.js
+cp src/styles.css dist/styles.css
+cp src/app.js dist/app.js
+
+if [[ -f src/data/opportunities.json ]]; then
+  cp src/data/opportunities.json dist/data/opportunities.json
+else
+  echo '{"updatedAt":null,"items":[]}' > dist/data/opportunities.json
+fi
+
+# Cache-bust asset version using short git SHA or timestamp
+VERSION="$(git rev-parse --short HEAD 2>/dev/null || date +%s)"
+sed -i.bak "s/__APP_VERSION__/${VERSION}/g" dist/sw.js dist/index.html && rm -f dist/*.bak
+
+echo "Built static PWA into ./dist (version: ${VERSION})"
+
+if [[ "$BUILD_ONLY" == true ]]; then
+  exit 0
+fi
+
+# Optional local/direct gh-pages push if not running inside GitHub Actions Pages artifact flow
+if command -v gh >/dev/null 2>&1 && git remote get-url origin >/dev/null 2>&1; then
+  WORKTREE_DIR="$(mktemp -d)"
+  trap 'git worktree remove --force "$WORKTREE_DIR" >/dev/null 2>&1 || true' EXIT
+  git fetch origin gh-pages || true
+  if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+    git worktree add "$WORKTREE_DIR" origin/gh-pages
+  else
+    git worktree add --orphan -b gh-pages "$WORKTREE_DIR"
+  fi
+  rm -rf "${WORKTREE_DIR:?}"/*
+  cp -r dist/* "$WORKTREE_DIR"/
+  touch "$WORKTREE_DIR/.nojekyll"
+  (
+    cd "$WORKTREE_DIR"
+    git add -A
+    if ! git diff --cached --quiet; then
+      git commit -m "chore(pages): deploy Opportunity Hunter ${VERSION}"
+      git push origin gh-pages
+    fi
+  )
+  echo "Deployed ./dist to gh-pages branch."
+else
+  echo "Skipped gh-pages push (use GitHub Actions workflow .github/workflows/pages.yml in CI)."
+fi
+
+.github/workflows/hunter.yml
+name: Opportunity Hunter Discovery
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run discovery & scoring
+        run: npm run discover
+
+      - name: Commit updated opportunity feed
+        run: |
+          git config user.name "opportunity-hunter-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add src/data/opportunities.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(data): update discovered opportunities [skip ci]"
+            git push
+          fi
+
+.github/workflows/pages.yml
+name: Deploy PWA to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "src/**"
+      - "scripts/**"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build static PWA
+        run: ./scripts/build-and-deploy.sh --build-only
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "dist"
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+src/manifest.json
+{
+  "name": "Opportunity Hunter",
+  "short_name": "OppHunter",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "description": "Personal AI opportunity intelligence SPA PWA."
+}
+
+src/sw.js
+const CACHE_NAME = "opp-hunter-__APP_VERSION__";
+const CORE_ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.json"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+  event.respondWith(
+    fetch(event.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
+  );
+});
+
+src/index.html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="stylesheet" href="./styles.css?v=__APP_VERSION__" />
+  <title>Opportunity Hunter</title>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Opportunity Hunter</h1>
+      <p id="syncMeta" class="muted">Offline-ready SPA PWA</p>
+    </div>
+    <div class="actions">
+      <button id="exportBtn" type="button">Export JSON</button>
+      <label class="btn-like">Import JSON <input id="importInput" type="file" accept="application/json" hidden /></label>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="stats" class="stats-grid"></section>
+
+    <section class="card">
+      <h2>Add Opportunity</h2>
+      <form id="oppForm" class="form-grid">
+        <input name="title" placeholder="Role / Program title" required />
+        <input name="organization" placeholder="Organization (e.g. Alignerr, Prolific)" required />
+        <select name="category">
+          <option>Recruitment & Contracting</option>
+          <option>Research & Model Evaluation</option>
+          <option>Early Access & Credits</option>
+          <option>Grants & Competitions</option>
+          <option>Partnerships & Innovation</option>
+          <option>Community & Exclusive Access</option>
+        </select>
+        <input name="location" placeholder="Location / Remote (e.g. Remote, Sweden)" />
+        <input name="url" type="url" placeholder="https://..." />
+        <input name="tags" placeholder="Tags (comma-separated: llm, eval, rust)" />
+        <textarea name="summary" rows="2" placeholder="Notes, eligibility, compensation, deadline"></textarea>
+        <button type="submit">Add to Tracker</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <input id="searchInput" placeholder="Search title, org, tag..." />
+        <select id="statusFilter">
+          <option value="all">All statuses</option>
+          <option value="new">New</option>
+          <option value="saved">Saved</option>
+          <option value="preparing">Preparing</option>
+          <option value="applied">Applied</option>
+          <option value="dismissed">Dismissed</option>
+        </select>
+      </div>
+      <div id="oppList" class="opp-list"></div>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js?v=__APP_VERSION__"></script>
+</body>
+</html>
+
+src/styles.css
+:root {
+  --bg: #0b1020;
+  --panel: #131b31;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+  --border: #24304d;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+h1, h2, p { margin: 0; }
+h1 { font-size: 1.2rem; }
+h2 { font-size: 1rem; margin-bottom: 12px; }
+.muted { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+
+.container { max-width: 960px; margin: 20px auto; padding: 0 16px; display: grid; gap: 16px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.stat strong { font-size: 1.4rem; display: block; color: var(--accent); }
+
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.form-grid textarea, .form-grid button { grid-column: 1 / -1; }
+
+input, select, textarea, button, .btn-like {
+  background: #0d1426;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 0.92rem;
+}
+
+button, .btn-like {
+  cursor: pointer;
+  background: var(--accent);
+  color: #06101e;
+  font-weight: 600;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.actions .btn-like, .actions button { background: #1d2a4a; color: var(--text); border: 1px solid var(--border); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.toolbar input { flex: 1 1 220px; }
+
+.opp-list { display: grid; gap: 10px; }
+.opp-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: #0d1426;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opp-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.badge { font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; background: #1b2c4e; color: var(--accent); }
+.opp-meta { font-size: 0.84rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 10px; }
+.opp-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.opp-actions button { padding: 6px 10px; font-size: 0.82rem; background: #182542; color: var(--text); border: 1px solid var(--border); }
+
+src/app.js
+const STORAGE_KEY = "opp_hunter_state_v1";
+
+const SEED_ITEMS = [
+  {
+    id: "seed-alignerr",
+    title: "Technical AI Model Evaluator & Coding Trainer",
+    organization: "Alignerr",
+    category: "Research & Model Evaluation",
+    location: "Remote / Sweden check",
+    url: "https://www.alignerr.com",
+    summary: "Evaluate LLM outputs, code reasoning, and instruction following.",
+    tags: ["llm", "evaluation", "coding"],
+    score: 86,
+    eligibility: "likely_eligible",
+    rationale: "Matches technical evaluation + coding + remote/Sweden check",
+    workflowStatus: "saved"
+  },
+  {
+    id: "seed-prolific",
+    title: "AI & Human-in-the-Loop Research Studies",
+    organization: "Prolific",
+    category: "Research & Model Evaluation",
+    location: "Remote / Sweden supported",
+    url: "https://www.prolific.com",
+    summary: "Paid academic and industry research tasks including model evaluation.",
+    tags: ["research", "evaluation", "sweden"],
+    score: 82,
+    eligibility: "confirmed_eligible",
+    rationale: "Sweden supported; flexible research participation",
+    workflowStatus: "new"
+  }
+];
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return { items: SEED_ITEMS, updatedAt: null };
+}
+
+function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function computeScore(item) {
+  const text = `${item.title} ${item.organization} ${item.location} ${item.summary} ${(item.tags || []).join(" ")}`.toLowerCase();
+  const keywords = ["llm", "eval", "evaluation", "agent", "code", "coding", "python", "typescript", "research", "grant", "credits", "sweden", "remote"];
+  const hits = keywords.filter((k) => text.includes(k));
+  const score = Math.min(98, 45 + hits.length * 7);
+
+  let eligibility = "uncertain";
+  if (text.includes("sweden")) eligibility = "confirmed_eligible";
+  else if (text.includes("remote") || text.includes("international")) eligibility = "likely_eligible";
+
+  return {
+    score,
+    eligibility,
+    rationale: `Signals: ${hits.join(", ") || "manual entry"} · Eligibility: ${eligibility}`
+  };
+}
+
+let state = loadState();
+
+async function mergeRemoteFeed() {
+  try {
+    const res = await fetch("./data/opportunities.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!Array.isArray(data.items) || data.items.length === 0) return;
+
+    const existingIds = new Set(state.items.map((i) => i.id));
+    for (const remoteItem of data.items) {
+      if (!existingIds.has(remoteItem.id)) {
+        state.items.unshift(remoteItem);
+      }
+    }
+    state.updatedAt = data.updatedAt || state.updatedAt;
+    saveState(state);
+  } catch (_) {}
+}
+
+function render() {
+  const q = document.getElementById("searchInput").value.trim().toLowerCase();
+  const statusFilter = document.getElementById("statusFilter").value;
+
+  const filtered = state.items.filter((item) => {
+    if (statusFilter !== "all" && item.workflowStatus !== statusFilter) return false;
+    if (!q) return true;
+    const hay = `${item.title} ${item.organization} ${item.category} ${item.location} ${item.summary} ${(item.tags || []).join(" ")}`.toLowerCase();
+    return hay.includes(q);
+  });
+
+  const strongCount = state.items.filter((i) => (i.score || 0) >= 80 && i.workflowStatus !== "dismissed").length;
+  const savedCount = state.items.filter((i) => ["saved", "preparing", "applied"].includes(i.workflowStatus)).length;
+
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><span>Tracked</span><strong>${state.items.length}</strong></div>
+    <div class="stat"><span>Strong Matches</span><strong>${strongCount}</strong></div>
+    <div class="stat"><span>Active Pipeline</span><strong>${savedCount}</strong></div>
+  `;
+
+  document.getElementById("syncMeta").textContent = state.updatedAt
+    ? `Last feed sync: ${new Date(state.updatedAt).toLocaleString()} · Offline PWA`
+    : "Local + offline-ready SPA PWA";
+
+  const listEl = document.getElementById("oppList");
+  if (!filtered.length) {
+    listEl.innerHTML = `<p class="muted">No matching opportunities.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = filtered
+    .map(
+      (item) => `
+      <article class="opp-item">
+        <div class="opp-head">
+          <div>
+            <strong>${escapeHtml(item.title)}</strong> — <span class="muted">${escapeHtml(item.organization)}</span>
+          </div>
+          <span class="badge">${item.score ?? 50}% fit · ${escapeHtml(item.workflowStatus)}</span>
+        </div>
+        <div class="opp-meta">
+          <span>${escapeHtml(item.category)}</span>
+          <span>${escapeHtml(item.location || "Location TBD")}</span>
+          <span>Eligibility: ${escapeHtml(item.eligibility || "uncertain")}</span>
+        </div>
+        <p class="muted">${escapeHtml(item.summary || "")}</p>
+        <p class="muted">${escapeHtml(item.rationale || "")}</p>
+        <div class="opp-actions">
+          ${item.url ? `<a class="btn-like" href="${escapeAttr(item.url)}" target="_blank" rel="noopener noreferrer">Open</a>` : ""}
+          <button type="button" data-act="saved" data-id="${escapeAttr(item.id)}">Save</button>
+          <button type="button" data-act="applied" data-id="${escapeAttr(item.id)}">Mark Applied</button>
+          <button type="button" data-act="dismissed" data-id="${escapeAttr(item.id)}">Dismiss</button>
+        </div>
+      </article>`
+    )
+    .join("");
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function escapeAttr(s) {
+  return escapeHtml(s);
+}
+
+document.getElementById("oppForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const base = {
+    id: `manual-${Date.now()}`,
+    title: String(fd.get("title") || "").trim(),
+    organization: String(fd.get("organization") || "").trim(),
+    category: String(fd.get("category") || "Recruitment & Contracting"),
+    location: String(fd.get("location") || "Unknown").trim(),
+    url: String(fd.get("url") || "").trim(),
+    tags: String(fd.get("tags") || "").split(",").map((t) => t.trim()).filter(Boolean),
+    summary: String(fd.get("summary") || "").trim(),
+    workflowStatus: "saved"
+  };
+  const scored = computeScore(base);
+  state.items.unshift({ ...base, ...scored });
+  saveState(state);
+  e.target.reset();
+  render();
+});
+
+document.getElementById("oppList").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const act = btn.dataset.act;
+  const target = state.items.find((i) => i.id === id);
+  if (!target) return;
+  target.workflowStatus = act;
+  saveState(state);
+  render();
+});
+
+document.getElementById("searchInput").addEventListener("input", render);
+document.getElementById("statusFilter").addEventListener("change", render);
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "opportunity-hunter-backup.json";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("importInput").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const parsed = JSON.parse(await file.text());
+  if (Array.isArray(parsed.items)) {
+    state = { items: parsed.items, updatedAt: parsed.updatedAt || new Date().toISOString() };
+    saveState(state);
+    render();
+  }
+});
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+}
+
+render();
+mergeRemoteFeed().then(render);
+
+Enable GitHub Pages
+ * Push the repository to GitHub (main branch).
+ * In Settings → Pages → Build and deployment, set Source to GitHub Actions.
+ * Add your verified RSS/Atom or JSON source endpoints in scripts/discover.mjs (SOURCES), then run Actions → Opportunity Hunter Discovery → Run workflow.

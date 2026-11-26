@@ -1,0 +1,6 @@
+{
+  "name": "Opportunity Hunter",
+  "description": "Personal AI opportunity intelligence SPA PWA for tracking, scoring, and managing technical evaluation, research, grant, and remote contracting opportunities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
