@@ -8,6 +8,7 @@ import type {
   ScoringWeights,
   VerificationStatus,
   WorkflowStatus,
+  ItemType,
 } from '../types';
 import {
   DEFAULT_WEIGHTS as RAW_DEFAULT_WEIGHTS,
@@ -110,8 +111,7 @@ function inferDefaultProvenance(
       sourceId: 'feed',
       sourceName: 'Automated Feed',
       discoveredAt: opp.discoveredAt,
-      lastVerifiedAt: opp.lastCheckedAt,
-      verificationStatus: 'verified',
+      verificationStatus: 'unverified',
     };
   }
   return {
@@ -181,13 +181,14 @@ function normalizeProvenance(
       discoveredAt: sanitizeText(p.discoveredAt, 30) || discoveredAt,
       lastVerifiedAt: sanitizeText(p.lastVerifiedAt, 40) || undefined,
       verificationStatus,
+      verifiedBy: p.verifiedBy === 'user' ? 'user' : undefined,
     };
   }
   return {
     sourceId: defaultSource,
     sourceName: defaultSource === 'feed' ? 'Automated Discovery Feed' : 'JSON Batch Import',
     discoveredAt,
-    verificationStatus: defaultSource === 'feed' ? 'verified' : 'unverified',
+    verificationStatus: 'unverified',
   };
 }
 
@@ -274,6 +275,11 @@ export function parseUntrustedJsonBatch(
           lastCheckedAt,
           source: defaultSource,
           provenance,
+          itemType: (entry.itemType === 'announcement' ? 'announcement' : 'opportunity') as ItemType,
+          excludedRegions: Array.isArray(entry.excludedRegions)
+            ? entry.excludedRegions.map((r: unknown) => sanitizeText(r, 60)).filter(Boolean)
+            : undefined,
+          eligibilityNote: sanitizeText(entry.eligibilityNote, 200) || undefined,
         };
 
         const assessment = scoreOpportunity(base, profile);

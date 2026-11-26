@@ -1,4 +1,4 @@
-import type {AppState, FeedSyncStats, Opportunity, SyncStatus} from '../types';
+import type {AppState, FeedSyncStats, Opportunity, ResourceLink, SyncStatus} from '../types';
 import {getSeedOpportunities, INITIAL_PROFILE} from './seed';
 import {buildDedupeKey, parseUntrustedJsonBatch, rescoreAllOpportunities, scoreOpportunity} from './scoring';
 
@@ -165,14 +165,50 @@ function readFromLocalStorage(): AppState | null {
   }
 }
 
+/** Feed items are never verified by the pipeline; clear legacy 'verified' flags the user did not set. */
+function demoteFeedVerification(state: AppState): AppState {
+  return {
+    ...state,
+    opportunities: state.opportunities.map((o) =>
+      o.source === 'feed' &&
+      o.provenance?.verificationStatus === 'verified' &&
+      o.provenance.verifiedBy !== 'user'
+        ? {...o, provenance: {...o.provenance, verificationStatus: 'unverified' as const, lastVerifiedAt: undefined}}
+        : o
+    ),
+  };
+}
+
+function parseResources(raw: unknown): ResourceLink[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ResourceLink[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') continue;
+    const e = r as Record<string, unknown>;
+    const url = typeof e.url === 'string' && /^https?:\/\//i.test(e.url) ? e.url.slice(0, 300) : '';
+    const name = typeof e.name === 'string' ? e.name.slice(0, 100).trim() : '';
+    if (!url || !name) continue;
+    out.push({
+      id: typeof e.id === 'string' && e.id ? e.id.slice(0, 80) : `res-${out.length}`,
+      name,
+      url,
+      type: typeof e.type === 'string' ? e.type.slice(0, 30) : 'other',
+      note: typeof e.note === 'string' ? e.note.slice(0, 200) : undefined,
+      source: 'feed',
+    });
+  }
+  return out;
+}
+
 export function loadInitialSyncState(): AppState {
-  return readFromLocalStorage() || getDefaultState();
+  const s = readFromLocalStorage();
+  return s ? demoteFeedVerification(s) : getDefaultState();
 }
 
 export async function loadAppState(): Promise<AppState> {
   const fromIdb = await readFromIDB();
   if (fromIdb && Array.isArray(fromIdb.opportunities)) {
-    return hydrateState(fromIdb);
+    return demoteFeedVerification(hydrateState(fromIdb));
   }
 
   const fromLs = readFromLocalStorage();
@@ -328,7 +364,13 @@ export async function mergeRemoteFeed(currentState: AppState): Promise<SyncResul
           tags: remoteItem.tags.length > 0 ? remoteItem.tags : existing.tags,
           externalStatus: remoteItem.externalStatus || existing.externalStatus,
           lastCheckedAt: remoteItem.lastCheckedAt || existing.lastCheckedAt,
-          provenance: remoteItem.provenance || existing.provenance,
+          provenance:
+            existing.provenance?.verifiedBy === 'user'
+              ? existing.provenance
+              : remoteItem.provenance || existing.provenance,
+          itemType: remoteItem.itemType ?? existing.itemType,
+          excludedRegions: remoteItem.excludedRegions ?? existing.excludedRegions,
+          eligibilityNote: remoteItem.eligibilityNote ?? existing.eligibilityNote,
           source: 'feed',
           dedupeKey: key,
         };
@@ -358,12 +400,16 @@ export async function mergeRemoteFeed(currentState: AppState): Promise<SyncResul
     const message = hasPartialErrors
       ? `Partial feed sync: ${addedCount} new, ${updatedCount} refreshed (one or more sources reported errors).`
       : addedCount > 0 || updatedCount > 0
-        ? `Synced ${parsed.items.length} verified feed items (${addedCount} new, ${updatedCount} refreshed).`
-        : 'Feed checked — all verified items are already up to date.';
+        ? `Synced ${parsed.items.length} feed items (unverified until you check them) (${addedCount} new, ${updatedCount} refreshed).`
+        : 'Feed checked — all items are already up to date.';
 
     const nextState: AppState = {
       ...currentState,
       opportunities: [...newItems, ...mergedList],
+      resources: [
+        ...parseResources((raw as {resources?: unknown}).resources),
+        ...(currentState.resources || []).filter((r) => r.source === 'user'),
+      ],
       lastFeedSync: syncedTime,
       feedStats,
       syncStatus: status,
