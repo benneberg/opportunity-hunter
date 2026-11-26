@@ -3,6 +3,7 @@ import {Plus} from 'lucide-react';
 import type {ActiveTab, AppState, DeveloperProfile, Opportunity, WorkflowStatus} from './types';
 import {
   loadAppState,
+  loadInitialSyncState,
   mergeRemoteFeed,
   resetToDefaultState,
   saveAppState,
@@ -30,7 +31,7 @@ const TAB_LABELS: Record<ActiveTab, string> = {
 };
 
 export default function App() {
-  const [state, setState] = useState<AppState | null>(null);
+  const [state, setState] = useState<AppState>(() => loadInitialSyncState());
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
@@ -41,17 +42,21 @@ export default function App() {
   const [editingOpp, setEditingOpp] = useState<Opportunity | null>(null);
   const [inspectingId, setInspectingId] = useState<string | null>(null);
 
-  // Load IndexedDB / localStorage state on mount and sync static feed
+  // Hydrate IndexedDB state and sync static feed in background
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const loaded = await loadAppState();
-      if (!mounted) return;
-      setState(loaded);
-      const merged = await mergeRemoteFeed(loaded);
-      if (!mounted) return;
-      if (merged.addedCount > 0 || merged.updatedAt !== loaded.lastFeedSync) {
-        setState(merged.state);
+      try {
+        const loaded = await loadAppState();
+        if (!mounted) return;
+        setState(loaded);
+        const merged = await mergeRemoteFeed(loaded);
+        if (!mounted) return;
+        if (merged.addedCount > 0 || merged.updatedCount > 0 || merged.updatedAt !== loaded.lastFeedSync) {
+          setState(merged.state);
+        }
+      } catch {
+        // Sync initial state remains active
       }
     })();
     return () => {
@@ -61,14 +66,13 @@ export default function App() {
 
   // Apply .dark class to <html>
   useEffect(() => {
-    if (!state) return;
     const root = document.documentElement;
     if (state.theme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
-  }, [state?.theme]);
+  }, [state.theme]);
 
   const commitState = (next: AppState) => {
     setState(next);
@@ -212,19 +216,10 @@ export default function App() {
   };
 
   const handleResetAll = () => {
-    if (!state) return;
     const resetState = resetToDefaultState(state.theme);
     commitState(resetState);
     setBackupMessage('Restored seeded opportunities and default PRD profile.');
   };
-
-  if (!state) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0B111E] text-sm text-slate-500">
-        Loading workspace...
-      </div>
-    );
-  }
 
   const inspectingOpp =
     inspectingId ? state.opportunities.find((o) => o.id === inspectingId) || null : null;

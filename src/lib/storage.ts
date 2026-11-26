@@ -23,6 +23,14 @@ function openDatabase(): Promise<IDBDatabase | null> {
     return Promise.resolve(null);
   }
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (db: IDBDatabase | null) => {
+      if (!settled) {
+        settled = true;
+        resolve(db);
+      }
+    };
+    const timer = setTimeout(() => finish(null), 1200);
     try {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
@@ -31,10 +39,21 @@ function openDatabase(): Promise<IDBDatabase | null> {
           db.createObjectStore(STORE_NAME);
         }
       };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
+      req.onsuccess = () => {
+        clearTimeout(timer);
+        finish(req.result);
+      };
+      req.onerror = () => {
+        clearTimeout(timer);
+        finish(null);
+      };
+      req.onblocked = () => {
+        clearTimeout(timer);
+        finish(null);
+      };
     } catch {
-      resolve(null);
+      clearTimeout(timer);
+      finish(null);
     }
   });
 }
@@ -43,14 +62,33 @@ async function readFromIDB(): Promise<AppState | null> {
   const db = await openDatabase();
   if (!db) return null;
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (val: AppState | null) => {
+      if (!settled) {
+        settled = true;
+        resolve(val);
+      }
+    };
+    const timer = setTimeout(() => finish(null), 1200);
     try {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const req = store.get(RECORD_KEY);
-      req.onsuccess = () => resolve((req.result as AppState) || null);
-      req.onerror = () => resolve(null);
+      req.onsuccess = () => {
+        clearTimeout(timer);
+        finish((req.result as AppState) || null);
+      };
+      req.onerror = () => {
+        clearTimeout(timer);
+        finish(null);
+      };
+      tx.onabort = () => {
+        clearTimeout(timer);
+        finish(null);
+      };
     } catch {
-      resolve(null);
+      clearTimeout(timer);
+      finish(null);
     }
   });
 }
@@ -59,14 +97,33 @@ async function writeToIDB(state: AppState): Promise<void> {
   const db = await openDatabase();
   if (!db) return;
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    };
+    const timer = setTimeout(finish, 1200);
     try {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       store.put(state, RECORD_KEY);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
+      tx.oncomplete = () => {
+        clearTimeout(timer);
+        finish();
+      };
+      tx.onerror = () => {
+        clearTimeout(timer);
+        finish();
+      };
+      tx.onabort = () => {
+        clearTimeout(timer);
+        finish();
+      };
     } catch {
-      resolve();
+      clearTimeout(timer);
+      finish();
     }
   });
 }
@@ -82,11 +139,16 @@ function readFromLocalStorage(): AppState | null {
       opportunities: rescoreAllOpportunities(parsed.opportunities, profile),
       profile,
       lastFeedSync: parsed.lastFeedSync || null,
+      feedStats: parsed.feedStats || null,
       theme: parsed.theme === 'dark' ? 'dark' : 'light',
     };
   } catch {
     return null;
   }
+}
+
+export function loadInitialSyncState(): AppState {
+  return readFromLocalStorage() || getDefaultState();
 }
 
 export async function loadAppState(): Promise<AppState> {
@@ -97,6 +159,7 @@ export async function loadAppState(): Promise<AppState> {
       opportunities: rescoreAllOpportunities(fromIdb.opportunities, profile),
       profile,
       lastFeedSync: fromIdb.lastFeedSync || null,
+      feedStats: fromIdb.feedStats || null,
       theme: fromIdb.theme === 'dark' ? 'dark' : 'light',
     };
   }

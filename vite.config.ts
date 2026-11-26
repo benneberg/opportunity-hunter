@@ -79,7 +79,8 @@ export default defineConfig(() => {
         },
         devOptions: {
           enabled: true,
-          type: 'module',
+          type: 'classic',
+          navigateFallbackAllowlist: [/^\/__pwa_offline_fallback__$/],
         },
       }),
       // Copies src/assets into dist/ so root-relative URLs like
